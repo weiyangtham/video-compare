@@ -49,6 +49,9 @@ const elements = {
     offsetInput: document.getElementById(`${prefix}OffsetInput`),
     currentTimeOutput: document.getElementById(`${prefix}CurrentTime`),
     timelineRange: document.getElementById(`${prefix}TimelineRange`),
+    captureStillButton: document.getElementById(`${prefix}CaptureStillButton`),
+    captureClipButton: document.getElementById(`${prefix}CaptureClipButton`),
+    captureSummary: document.getElementById(`${prefix}CaptureSummary`),
     tagLabelInput: document.getElementById(`${prefix}TagLabel`),
     tagNotesInput: document.getElementById(`${prefix}TagNotes`),
     addTagButton: document.getElementById(`${prefix}AddTagButton`),
@@ -75,6 +78,8 @@ function createSlotState(slotKey) {
     zoomScale: 1,
     panX: 0,
     panY: 0,
+    lastCaptureLabel: "",
+    captureBusy: false,
     elements: null,
   };
 }
@@ -134,6 +139,8 @@ function bindSlotEvents(slotKey) {
     dropZone,
     offsetInput,
     timelineRange,
+    captureStillButton,
+    captureClipButton,
     addTagButton,
     clearTagsButton,
     zoomInButton,
@@ -221,6 +228,13 @@ function bindSlotEvents(slotKey) {
     seekSlotToTime(slotKey, Number(event.target.value));
   });
   bindScrubberGesture(timelineRange, slotKey);
+
+  captureStillButton.addEventListener("click", () => {
+    void captureStill(slotKey);
+  });
+  captureClipButton.addEventListener("click", () => {
+    void captureClip(slotKey);
+  });
 
   zoomInButton.addEventListener("click", () => adjustZoom(slotKey, ZOOM_STEP));
   zoomOutButton.addEventListener("click", () => adjustZoom(slotKey, -ZOOM_STEP));
@@ -319,6 +333,8 @@ async function loadFileIntoSlot(slotKey, file) {
   slot.objectUrl = URL.createObjectURL(file);
   slot.duration = 0;
   slot.tags = [];
+  slot.lastCaptureLabel = "";
+  slot.captureBusy = false;
 
   const savedState = readSlotState(slotKey, slot.fileKey);
   slot.offsetSeconds = savedState.offsetSeconds;
@@ -510,7 +526,12 @@ function render() {
     slot.elements.timeReadout.textContent = formatTime(slotTime);
     slot.elements.timelineRange.max = String(slot.duration || 0.01);
     slot.elements.zoomReadout.textContent = `${Math.round(slot.zoomScale * 100)}%`;
+    slot.elements.captureStillButton.disabled = !slot.file || slot.captureBusy;
+    slot.elements.captureClipButton.disabled = !slot.file || slot.captureBusy;
+    slot.elements.captureClipButton.textContent = slot.captureBusy ? "Capturing..." : "Grab Short Clip";
+    slot.elements.captureSummary.textContent = slot.lastCaptureLabel || "No captures yet.";
     slot.elements.videoStage.style.transform = `translate(${slot.panX}px, ${slot.panY}px) scale(${slot.zoomScale})`;
+    slot.elements.dropZone.classList.toggle("has-video", Boolean(slot.file));
     slot.elements.dropZone.classList.toggle("zoomed", slot.zoomScale > 1.001);
     slot.elements.dropZone.classList.toggle("is-panning", state.activePan?.slotKey === slot.slotKey);
     if (state.activeScrubber !== slot.slotKey) {
@@ -765,6 +786,8 @@ function clearSlotMedia(slot) {
   slot.zoomScale = 1;
   slot.panX = 0;
   slot.panY = 0;
+  slot.lastCaptureLabel = "";
+  slot.captureBusy = false;
 
   fileName.textContent = "No file selected";
   timeReadout.textContent = "00:00.00";
@@ -847,6 +870,229 @@ function defaultSlotPersistence() {
     panX: 0,
     panY: 0,
   };
+}
+
+async function captureStill(slotKey) {
+  const slot = state.slots[slotKey];
+  const { video } = slot.elements;
+  if (!slot.file || !slot.duration || video.readyState < 2) {
+    state.statusMessage = `Load a ${slotKey} video before grabbing a still.`;
+    render();
+    return;
+  }
+
+  const canvas = document.createElement("canvas");
+  canvas.width = video.videoWidth || 1280;
+  canvas.height = video.videoHeight || 720;
+  const context = canvas.getContext("2d");
+
+  if (!context) {
+    state.statusMessage = "This browser could not create a capture canvas.";
+    render();
+    return;
+  }
+
+  context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+  const blob = await canvasToBlob(canvas, "image/png");
+  if (!blob) {
+    state.statusMessage = "Still capture failed.";
+    render();
+    return;
+  }
+
+  const slotTime = getSlotTargetTime(slot, state.timelineTime);
+  const fileName = buildCaptureFilename(slot, "still", slotTime, "png");
+  downloadBlob(blob, fileName);
+
+  slot.lastCaptureLabel = `Still saved at ${formatTime(slotTime)}.`;
+  state.statusMessage = `Saved ${slotKey} still: ${fileName}`;
+  render();
+}
+
+async function captureClip(slotKey) {
+  const slot = state.slots[slotKey];
+  if (!slot.file || !slot.duration || slot.captureBusy) {
+    return;
+  }
+
+  const clipRange = getClipRangeForSlot(slot);
+  if (!clipRange) {
+    state.statusMessage = `Could not determine a clip range for the ${slotKey} video.`;
+    render();
+    return;
+  }
+
+  if (typeof MediaRecorder === "undefined") {
+    state.statusMessage = "Short clip capture is not supported in this browser.";
+    render();
+    return;
+  }
+
+  slot.captureBusy = true;
+  state.statusMessage = `Capturing ${slotKey} clip from ${formatTime(clipRange.start)} to ${formatTime(clipRange.end)}...`;
+  render();
+
+  try {
+    const blob = await recordSlotClip(slot, clipRange);
+    const fileName = buildCaptureFilename(slot, "clip", clipRange.start, "webm");
+    downloadBlob(blob, fileName);
+    slot.lastCaptureLabel = `Clip saved: ${formatTime(clipRange.start)} to ${formatTime(clipRange.end)}.`;
+    state.statusMessage = `Saved ${slotKey} clip: ${fileName}`;
+  } catch (_) {
+    state.statusMessage = `Short clip capture failed for the ${slotKey} video.`;
+  } finally {
+    slot.captureBusy = false;
+    render();
+  }
+}
+
+function getClipRangeForSlot(slot) {
+  const maxLoopDuration = 4;
+
+  if (hasLoop()) {
+    const start = clamp(state.loopStart - slot.offsetSeconds, 0, slot.duration);
+    const unclampedEnd = clamp(state.loopEnd - slot.offsetSeconds, 0, slot.duration);
+    const end = Math.min(unclampedEnd, start + maxLoopDuration);
+    if (end > start) {
+      return { start, end };
+    }
+  }
+
+  const start = clamp(getSlotTargetTime(slot, state.timelineTime), 0, slot.duration);
+  const end = Math.min(slot.duration, start + 3);
+  return end > start ? { start, end } : null;
+}
+
+async function recordSlotClip(slot, clipRange) {
+  const mimeType = getSupportedClipMimeType();
+  if (!mimeType) {
+    throw new Error("unsupported-recorder");
+  }
+
+  const captureVideo = document.createElement("video");
+  captureVideo.muted = true;
+  captureVideo.playsInline = true;
+  captureVideo.preload = "auto";
+  captureVideo.src = slot.objectUrl;
+
+  await waitForEvent(captureVideo, "loadedmetadata");
+
+  const canvas = document.createElement("canvas");
+  canvas.width = captureVideo.videoWidth || 1280;
+  canvas.height = captureVideo.videoHeight || 720;
+  const context = canvas.getContext("2d");
+  if (!context) {
+    throw new Error("missing-canvas-context");
+  }
+
+  const stream = canvas.captureStream(30);
+  const recorder = new MediaRecorder(stream, { mimeType });
+  const chunks = [];
+
+  recorder.addEventListener("dataavailable", (event) => {
+    if (event.data?.size) {
+      chunks.push(event.data);
+    }
+  });
+
+  const stopped = new Promise((resolve) => {
+    recorder.addEventListener(
+      "stop",
+      () => {
+        resolve(new Blob(chunks, { type: mimeType }));
+      },
+      { once: true }
+    );
+  });
+
+  captureVideo.currentTime = clipRange.start;
+  await waitForEvent(captureVideo, "seeked");
+  context.drawImage(captureVideo, 0, 0, canvas.width, canvas.height);
+
+  recorder.start();
+  let rafId = null;
+
+  await new Promise((resolve, reject) => {
+    const draw = () => {
+      context.drawImage(captureVideo, 0, 0, canvas.width, canvas.height);
+
+      if (captureVideo.currentTime >= clipRange.end || captureVideo.ended) {
+        resolve();
+        return;
+      }
+
+      rafId = requestAnimationFrame(draw);
+    };
+
+    captureVideo.addEventListener("error", () => reject(new Error("capture-video-error")), { once: true });
+    rafId = requestAnimationFrame(draw);
+    void captureVideo.play().catch(reject);
+  });
+
+  if (rafId !== null) {
+    cancelAnimationFrame(rafId);
+  }
+
+  captureVideo.pause();
+  recorder.stop();
+  const blob = await stopped;
+  stream.getTracks().forEach((track) => track.stop());
+  captureVideo.removeAttribute("src");
+  captureVideo.load();
+  return blob;
+}
+
+function getSupportedClipMimeType() {
+  const mimeTypes = ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"];
+  return mimeTypes.find((mimeType) => MediaRecorder.isTypeSupported(mimeType)) ?? "";
+}
+
+function canvasToBlob(canvas, mimeType) {
+  return new Promise((resolve) => {
+    canvas.toBlob(resolve, mimeType);
+  });
+}
+
+function waitForEvent(target, eventName) {
+  return new Promise((resolve, reject) => {
+    const onSuccess = () => {
+      cleanup();
+      resolve();
+    };
+    const onError = () => {
+      cleanup();
+      reject(new Error(`${eventName}-failed`));
+    };
+    const cleanup = () => {
+      target.removeEventListener(eventName, onSuccess);
+      target.removeEventListener("error", onError);
+    };
+
+    target.addEventListener(eventName, onSuccess, { once: true });
+    target.addEventListener("error", onError, { once: true });
+  });
+}
+
+function downloadBlob(blob, fileName) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  document.body.append(link);
+  link.click();
+  link.remove();
+
+  setTimeout(() => {
+    URL.revokeObjectURL(url);
+  }, 1000);
+}
+
+function buildCaptureFilename(slot, kind, timeSeconds, extension) {
+  const baseName = (slot.file?.name || `${slot.slotKey}-video`).replace(/\.[^./]+$/, "");
+  const safeBaseName = baseName.replace(/[^a-z0-9-_]+/gi, "-").replace(/^-+|-+$/g, "") || slot.slotKey;
+  const timestamp = formatTime(timeSeconds).replace(/[:.]/g, "-");
+  return `${safeBaseName}-${kind}-${timestamp}.${extension}`;
 }
 
 function handleVideoLoadError(slotKey) {
