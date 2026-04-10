@@ -211,6 +211,7 @@ input[type="range"] {
   border-radius: 18px;
   border: 1px solid var(--line);
   transition: border-color 120ms ease, box-shadow 120ms ease, transform 120ms ease;
+  touch-action: none;
 }
 
 .video-frame.drag-active {
@@ -219,11 +220,20 @@ input[type="range"] {
   transform: translateY(-1px);
 }
 
+.video-stage {
+  width: 100%;
+  height: 100%;
+  transform-origin: center center;
+  will-change: transform;
+}
+
 video {
   width: 100%;
   height: 100%;
   object-fit: contain;
   background: #070b11;
+  user-select: none;
+  pointer-events: none;
 }
 
 .drop-hint {
@@ -259,6 +269,44 @@ video {
   background: rgba(5, 8, 14, 0.76);
   color: var(--muted);
   font-size: 0.92rem;
+}
+
+.zoom-controls {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  z-index: 2;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: rgba(5, 8, 14, 0.76);
+  border: 1px solid rgba(174, 198, 255, 0.14);
+}
+
+.zoom-button {
+  min-width: 36px;
+  padding: 6px 10px;
+}
+
+.zoom-button-wide {
+  min-width: 64px;
+}
+
+.zoom-readout {
+  min-width: 48px;
+  text-align: right;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.video-frame.zoomed {
+  cursor: grab;
+}
+
+.video-frame.zoomed.is-panning {
+  cursor: grabbing;
 }
 
 .control-grid {
@@ -344,5 +392,12 @@ textarea {
   .video-grid,
   .control-grid {
     grid-template-columns: 1fr;
+  }
+
+  .zoom-controls {
+    left: 12px;
+    right: 12px;
+    justify-content: space-between;
+    flex-wrap: wrap;
   }
 }

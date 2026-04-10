@@ -61,8 +61,16 @@
             </div>
 
             <div class="video-frame" data-drop-zone="left">
-              <video id="leftVideo" playsinline muted></video>
+              <div class="video-stage" id="leftVideoStage">
+                <video id="leftVideo" playsinline muted></video>
+              </div>
               <div class="drop-hint" aria-hidden="true">Drop a video here</div>
+              <div class="zoom-controls" aria-label="Left video zoom controls">
+                <button id="leftZoomOutButton" type="button" class="zoom-button" aria-label="Zoom out">-</button>
+                <button id="leftZoomInButton" type="button" class="zoom-button" aria-label="Zoom in">+</button>
+                <button id="leftZoomResetButton" type="button" class="zoom-button zoom-button-wide">Reset</button>
+                <span id="leftZoomReadout" class="zoom-readout">100%</span>
+              </div>
               <div class="video-overlay">
                 <span id="leftFileName">No file selected</span>
                 <span id="leftTimeReadout">00:00.00</span>
@@ -117,8 +125,16 @@
             </div>
 
             <div class="video-frame" data-drop-zone="right">
-              <video id="rightVideo" playsinline muted></video>
+              <div class="video-stage" id="rightVideoStage">
+                <video id="rightVideo" playsinline muted></video>
+              </div>
               <div class="drop-hint" aria-hidden="true">Drop a video here</div>
+              <div class="zoom-controls" aria-label="Right video zoom controls">
+                <button id="rightZoomOutButton" type="button" class="zoom-button" aria-label="Zoom out">-</button>
+                <button id="rightZoomInButton" type="button" class="zoom-button" aria-label="Zoom in">+</button>
+                <button id="rightZoomResetButton" type="button" class="zoom-button zoom-button-wide">Reset</button>
+                <span id="rightZoomReadout" class="zoom-readout">100%</span>
+              </div>
               <div class="video-overlay">
                 <span id="rightFileName">No file selected</span>
                 <span id="rightTimeReadout">00:00.00</span>

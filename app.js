@@ -13,6 +13,7 @@ const state = {
   startedAtMs: null,
   timelineStartedAt: 0,
   activeScrubber: null,
+  activePan: null,
   slots: {
     left: createSlotState("left"),
     right: createSlotState("right"),
@@ -41,6 +42,7 @@ const elements = {
   state.slots[slotKey].elements = {
     fileInput: document.getElementById(`${prefix}FileInput`),
     video: document.getElementById(`${prefix}Video`),
+    videoStage: document.getElementById(`${prefix}VideoStage`),
     dropZone: document.querySelector(`[data-drop-zone="${prefix}"]`),
     fileName: document.getElementById(`${prefix}FileName`),
     timeReadout: document.getElementById(`${prefix}TimeReadout`),
@@ -52,6 +54,10 @@ const elements = {
     addTagButton: document.getElementById(`${prefix}AddTagButton`),
     clearTagsButton: document.getElementById(`${prefix}ClearTagsButton`),
     tagsContainer: document.getElementById(`${prefix}Tags`),
+    zoomInButton: document.getElementById(`${prefix}ZoomInButton`),
+    zoomOutButton: document.getElementById(`${prefix}ZoomOutButton`),
+    zoomResetButton: document.getElementById(`${prefix}ZoomResetButton`),
+    zoomReadout: document.getElementById(`${prefix}ZoomReadout`),
   };
 });
 
@@ -66,6 +72,9 @@ function createSlotState(slotKey) {
     duration: 0,
     offsetSeconds: 0,
     tags: [],
+    zoomScale: 1,
+    panX: 0,
+    panY: 0,
     elements: null,
   };
 }
@@ -127,6 +136,9 @@ function bindSlotEvents(slotKey) {
     timelineRange,
     addTagButton,
     clearTagsButton,
+    zoomInButton,
+    zoomOutButton,
+    zoomResetButton,
   } = slot.elements;
 
   fileInput.addEventListener("change", async (event) => {
@@ -210,6 +222,79 @@ function bindSlotEvents(slotKey) {
   });
   bindScrubberGesture(timelineRange, slotKey);
 
+  zoomInButton.addEventListener("click", () => adjustZoom(slotKey, ZOOM_STEP));
+  zoomOutButton.addEventListener("click", () => adjustZoom(slotKey, -ZOOM_STEP));
+  zoomResetButton.addEventListener("click", () => resetZoom(slotKey));
+
+  dropZone.addEventListener(
+    "wheel",
+    (event) => {
+      if (!slot.file) {
+        return;
+      }
+      event.preventDefault();
+      const direction = event.deltaY < 0 ? 1 : -1;
+      adjustZoom(slotKey, ZOOM_STEP * direction, {
+        clientX: event.clientX,
+        clientY: event.clientY,
+      });
+    },
+    { passive: false }
+  );
+
+  dropZone.addEventListener("dblclick", () => {
+    if (slot.file) {
+      resetZoom(slotKey);
+    }
+  });
+
+  dropZone.addEventListener("pointerdown", (event) => {
+    if (event.button !== 0 || !slot.file || slot.zoomScale <= 1) {
+      return;
+    }
+
+    if (event.target.closest(".zoom-controls")) {
+      return;
+    }
+
+    state.activePan = {
+      slotKey,
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      originPanX: slot.panX,
+      originPanY: slot.panY,
+    };
+    dropZone.setPointerCapture(event.pointerId);
+    render();
+  });
+
+  dropZone.addEventListener("pointermove", (event) => {
+    if (!state.activePan || state.activePan.slotKey !== slotKey || state.activePan.pointerId !== event.pointerId) {
+      return;
+    }
+
+    const nextPanX = state.activePan.originPanX + (event.clientX - state.activePan.startX);
+    const nextPanY = state.activePan.originPanY + (event.clientY - state.activePan.startY);
+    setPan(slotKey, nextPanX, nextPanY);
+  });
+
+  const releasePan = (event) => {
+    if (!state.activePan || state.activePan.slotKey !== slotKey || state.activePan.pointerId !== event.pointerId) {
+      return;
+    }
+
+    if (dropZone.hasPointerCapture(event.pointerId)) {
+      dropZone.releasePointerCapture(event.pointerId);
+    }
+    state.activePan = null;
+    persistSlotState(slotKey);
+    render();
+  };
+
+  dropZone.addEventListener("pointerup", releasePan);
+  dropZone.addEventListener("pointercancel", releasePan);
+
   addTagButton.addEventListener("click", () => addTag(slotKey));
   clearTagsButton.addEventListener("click", () => {
     slot.tags = [];
@@ -238,6 +323,9 @@ async function loadFileIntoSlot(slotKey, file) {
   const savedState = readSlotState(slotKey, slot.fileKey);
   slot.offsetSeconds = savedState.offsetSeconds;
   slot.tags = savedState.tags;
+  slot.zoomScale = savedState.zoomScale;
+  slot.panX = savedState.panX;
+  slot.panY = savedState.panY;
 
   video.src = slot.objectUrl;
   video.load();
@@ -415,9 +503,16 @@ function render() {
 
   Object.values(state.slots).forEach((slot) => {
     const slotTime = clamp(state.timelineTime - slot.offsetSeconds, 0, slot.duration || 0);
+    const boundedPan = clampPan(slot, slot.panX, slot.panY);
+    slot.panX = boundedPan.x;
+    slot.panY = boundedPan.y;
     slot.elements.currentTimeOutput.textContent = formatTime(slotTime);
     slot.elements.timeReadout.textContent = formatTime(slotTime);
     slot.elements.timelineRange.max = String(slot.duration || 0.01);
+    slot.elements.zoomReadout.textContent = `${Math.round(slot.zoomScale * 100)}%`;
+    slot.elements.videoStage.style.transform = `translate(${slot.panX}px, ${slot.panY}px) scale(${slot.zoomScale})`;
+    slot.elements.dropZone.classList.toggle("zoomed", slot.zoomScale > 1.001);
+    slot.elements.dropZone.classList.toggle("is-panning", state.activePan?.slotKey === slot.slotKey);
     if (state.activeScrubber !== slot.slotKey) {
       slot.elements.timelineRange.value = String(slotTime);
     }
@@ -540,6 +635,9 @@ function persistSlotState(slotKey) {
     JSON.stringify({
       offsetSeconds: slot.offsetSeconds,
       tags: slot.tags,
+      zoomScale: slot.zoomScale,
+      panX: slot.panX,
+      panY: slot.panY,
     })
   );
 }
@@ -547,7 +645,7 @@ function persistSlotState(slotKey) {
 function readSlotState(slotKey, fileKey) {
   const raw = localStorage.getItem(`${STORAGE_PREFIX}/${slotKey}/${fileKey}`);
   if (!raw) {
-    return { offsetSeconds: 0, tags: [] };
+    return defaultSlotPersistence();
   }
 
   try {
@@ -555,9 +653,12 @@ function readSlotState(slotKey, fileKey) {
     return {
       offsetSeconds: normalizeNumber(parsed.offsetSeconds, 0),
       tags: Array.isArray(parsed.tags) ? parsed.tags : [],
+      zoomScale: normalizeZoomScale(parsed.zoomScale),
+      panX: normalizeNumber(parsed.panX, 0),
+      panY: normalizeNumber(parsed.panY, 0),
     };
   } catch (_) {
-    return { offsetSeconds: 0, tags: [] };
+    return defaultSlotPersistence();
   }
 }
 
@@ -661,10 +762,91 @@ function clearSlotMedia(slot) {
   slot.fileKey = null;
   slot.objectUrl = null;
   slot.duration = 0;
+  slot.zoomScale = 1;
+  slot.panX = 0;
+  slot.panY = 0;
 
   fileName.textContent = "No file selected";
   timeReadout.textContent = "00:00.00";
   currentTimeOutput.textContent = "00:00.00";
+}
+
+const MIN_ZOOM = 1;
+const MAX_ZOOM = 4;
+const ZOOM_STEP = 0.25;
+
+function adjustZoom(slotKey, delta, anchor = null) {
+  const slot = state.slots[slotKey];
+  const nextScale = normalizeZoomScale(slot.zoomScale + delta);
+  setZoom(slotKey, nextScale, anchor);
+}
+
+function resetZoom(slotKey) {
+  if (state.activePan?.slotKey === slotKey) {
+    state.activePan = null;
+  }
+  setZoom(slotKey, 1);
+}
+
+function setZoom(slotKey, scale, anchor = null) {
+  const slot = state.slots[slotKey];
+  const nextScale = normalizeZoomScale(scale);
+  const previousScale = slot.zoomScale;
+  const frameRect = slot.elements.dropZone.getBoundingClientRect();
+
+  if (anchor && previousScale !== nextScale) {
+    const centerX = frameRect.width / 2;
+    const centerY = frameRect.height / 2;
+    const anchorX = anchor.clientX - frameRect.left;
+    const anchorY = anchor.clientY - frameRect.top;
+    const contentX = (anchorX - centerX - slot.panX) / previousScale;
+    const contentY = (anchorY - centerY - slot.panY) / previousScale;
+
+    slot.panX = anchorX - centerX - contentX * nextScale;
+    slot.panY = anchorY - centerY - contentY * nextScale;
+  }
+
+  slot.zoomScale = nextScale;
+  if (nextScale === 1) {
+    slot.panX = 0;
+    slot.panY = 0;
+  } else {
+    const boundedPan = clampPan(slot, slot.panX, slot.panY);
+    slot.panX = boundedPan.x;
+    slot.panY = boundedPan.y;
+  }
+
+  persistSlotState(slotKey);
+  render();
+}
+
+function setPan(slotKey, panX, panY) {
+  const slot = state.slots[slotKey];
+  const boundedPan = clampPan(slot, panX, panY);
+  slot.panX = boundedPan.x;
+  slot.panY = boundedPan.y;
+  render();
+}
+
+function clampPan(slot, panX, panY) {
+  const frameRect = slot.elements.dropZone.getBoundingClientRect();
+  const maxPanX = Math.max(0, (frameRect.width * (slot.zoomScale - 1)) / 2);
+  const maxPanY = Math.max(0, (frameRect.height * (slot.zoomScale - 1)) / 2);
+
+  return {
+    x: clamp(panX, -maxPanX, maxPanX),
+    y: clamp(panY, -maxPanY, maxPanY),
+  };
+}
+
+function defaultSlotPersistence() {
+  return {
+    offsetSeconds: 0,
+    tags: [],
+    zoomScale: 1,
+    panX: 0,
+    panY: 0,
+  };
 }
 
 function handleVideoLoadError(slotKey) {
@@ -718,6 +900,14 @@ function normalizePlaybackRate(value) {
   const allowedRates = [0.25, 0.5, 0.75, 1];
   const parsed = Number(value);
   return allowedRates.includes(parsed) ? parsed : 1;
+}
+
+function normalizeZoomScale(value) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    return 1;
+  }
+  return clamp(parsed, MIN_ZOOM, MAX_ZOOM);
 }
 
 function clamp(value, min, max) {
