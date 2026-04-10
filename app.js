@@ -4,6 +4,7 @@ const state = {
   mode: "compare",
   timelineTime: 0,
   playing: false,
+  playbackRate: 1,
   duration: 0,
   loopStart: null,
   loopEnd: null,
@@ -24,6 +25,7 @@ const elements = {
   playPauseButton: document.getElementById("playPauseButton"),
   stepBackButton: document.getElementById("stepBackButton"),
   stepForwardButton: document.getElementById("stepForwardButton"),
+  playbackRateSelect: document.getElementById("playbackRateSelect"),
   setLoopStartButton: document.getElementById("setLoopStartButton"),
   setLoopEndButton: document.getElementById("setLoopEndButton"),
   clearLoopButton: document.getElementById("clearLoopButton"),
@@ -70,6 +72,7 @@ function createSlotState(slotKey) {
 
 function init() {
   loadModeState();
+  loadTransportState();
   bindGlobalEvents();
   bindSlotEvents("left");
   bindSlotEvents("right");
@@ -80,6 +83,9 @@ function bindGlobalEvents() {
   elements.playPauseButton.addEventListener("click", togglePlayback);
   elements.stepBackButton.addEventListener("click", () => seekTo(state.timelineTime - 1));
   elements.stepForwardButton.addEventListener("click", () => seekTo(state.timelineTime + 1));
+  elements.playbackRateSelect.addEventListener("change", (event) => {
+    setPlaybackRate(Number(event.target.value));
+  });
   elements.setLoopStartButton.addEventListener("click", () => {
     state.loopStart = state.timelineTime;
     if (state.loopEnd !== null && state.loopEnd < state.loopStart) {
@@ -290,7 +296,7 @@ function tickPlayback() {
   }
 
   const elapsedSeconds = (performance.now() - state.startedAtMs) / 1000;
-  let nextTime = state.timelineStartedAt + elapsedSeconds;
+  let nextTime = state.timelineStartedAt + elapsedSeconds * state.playbackRate;
 
   if (hasLoop() && nextTime >= state.loopEnd) {
     nextTime = state.loopStart;
@@ -332,6 +338,8 @@ function syncVideoToTimeline(slot) {
   if (!slot.file || !slot.duration) {
     return;
   }
+
+  video.playbackRate = state.playbackRate;
 
   const targetTime = getSlotTargetTime(slot, state.timelineTime);
   const drift = Math.abs(video.currentTime - targetTime);
@@ -399,6 +407,7 @@ function render() {
     elements.timelineRange.value = String(clamp(state.timelineTime, 0, state.duration || 0));
   }
   elements.playPauseButton.textContent = state.playing ? "Pause" : "Play";
+  elements.playbackRateSelect.value = String(state.playbackRate);
   elements.timeReadout.textContent = `${formatTime(state.timelineTime)} / ${formatTime(state.duration)}`;
   elements.loopReadout.textContent = hasLoop()
     ? `Loop: ${formatTime(state.loopStart)} to ${formatTime(state.loopEnd)}`
@@ -482,6 +491,7 @@ function persistTransportState() {
     JSON.stringify({
       loopStart: state.loopStart,
       loopEnd: state.loopEnd,
+      playbackRate: state.playbackRate,
     })
   );
 }
@@ -505,9 +515,11 @@ function loadTransportState() {
     const parsed = JSON.parse(raw);
     state.loopStart = parsed.loopStart ?? null;
     state.loopEnd = parsed.loopEnd ?? null;
+    state.playbackRate = normalizePlaybackRate(parsed.playbackRate);
   } catch (_) {
     state.loopStart = null;
     state.loopEnd = null;
+    state.playbackRate = 1;
   }
 }
 
@@ -590,6 +602,23 @@ function bindScrubberGesture(element, scrubberKey) {
   ["pointerup", "mouseup", "touchend", "touchcancel", "change", "blur"].forEach((eventName) => {
     element.addEventListener(eventName, releaseScrubber);
   });
+}
+
+function setPlaybackRate(nextRate) {
+  const normalized = normalizePlaybackRate(nextRate);
+  if (normalized === state.playbackRate) {
+    return;
+  }
+
+  state.playbackRate = normalized;
+  if (state.playing) {
+    state.startedAtMs = performance.now();
+    state.timelineStartedAt = state.timelineTime;
+  }
+
+  syncAllVideos();
+  persistTransportState();
+  render();
 }
 
 function getSlotTargetTime(slot, timelineTime) {
@@ -683,6 +712,12 @@ function formatTime(totalSeconds) {
 function normalizeNumber(value, fallback) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function normalizePlaybackRate(value) {
+  const allowedRates = [0.25, 0.5, 0.75, 1];
+  const parsed = Number(value);
+  return allowedRates.includes(parsed) ? parsed : 1;
 }
 
 function clamp(value, min, max) {
