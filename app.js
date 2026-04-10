@@ -10,6 +10,7 @@ const state = {
   animationFrameId: null,
   startedAtMs: null,
   timelineStartedAt: 0,
+  activeScrubber: null,
   slots: {
     left: createSlotState("left"),
     right: createSlotState("right"),
@@ -39,6 +40,7 @@ const elements = {
     timeReadout: document.getElementById(`${prefix}TimeReadout`),
     offsetInput: document.getElementById(`${prefix}OffsetInput`),
     currentTimeOutput: document.getElementById(`${prefix}CurrentTime`),
+    timelineRange: document.getElementById(`${prefix}TimelineRange`),
     tagLabelInput: document.getElementById(`${prefix}TagLabel`),
     tagNotesInput: document.getElementById(`${prefix}TagNotes`),
     addTagButton: document.getElementById(`${prefix}AddTagButton`),
@@ -100,6 +102,7 @@ function bindGlobalEvents() {
     pausePlayback();
     seekTo(value);
   });
+  bindScrubberGesture(elements.timelineRange, "shared");
 }
 
 function bindSlotEvents(slotKey) {
@@ -109,6 +112,7 @@ function bindSlotEvents(slotKey) {
     video,
     dropZone,
     offsetInput,
+    timelineRange,
     addTagButton,
     clearTagsButton,
   } = slot.elements;
@@ -187,6 +191,12 @@ function bindSlotEvents(slotKey) {
     seekTo(state.timelineTime);
     render();
   });
+
+  timelineRange.addEventListener("input", (event) => {
+    pausePlayback();
+    seekSlotToTime(slotKey, Number(event.target.value));
+  });
+  bindScrubberGesture(timelineRange, slotKey);
 
   addTagButton.addEventListener("click", () => addTag(slotKey));
   clearTagsButton.addEventListener("click", () => {
@@ -375,7 +385,9 @@ function addTag(slotKey) {
 
 function render() {
   elements.timelineRange.max = String(state.duration || 0);
-  elements.timelineRange.value = String(clamp(state.timelineTime, 0, state.duration || 0));
+  if (state.activeScrubber !== "shared") {
+    elements.timelineRange.value = String(clamp(state.timelineTime, 0, state.duration || 0));
+  }
   elements.playPauseButton.textContent = state.playing ? "Pause" : "Play";
   elements.timeReadout.textContent = `${formatTime(state.timelineTime)} / ${formatTime(state.duration)}`;
   elements.loopReadout.textContent = hasLoop()
@@ -386,6 +398,10 @@ function render() {
     const slotTime = clamp(state.timelineTime - slot.offsetSeconds, 0, slot.duration || 0);
     slot.elements.currentTimeOutput.textContent = formatTime(slotTime);
     slot.elements.timeReadout.textContent = formatTime(slotTime);
+    slot.elements.timelineRange.max = String(slot.duration || 0.01);
+    if (state.activeScrubber !== slot.slotKey) {
+      slot.elements.timelineRange.value = String(slotTime);
+    }
   });
 
   elements.statusBanner.textContent = buildStatusText();
@@ -520,6 +536,35 @@ function getFirstVideoFile(dataTransfer) {
 function isFileDrag(dataTransfer) {
   const types = Array.from(dataTransfer?.types || []);
   return types.includes("Files");
+}
+
+function seekSlotToTime(slotKey, slotTime) {
+  const slot = state.slots[slotKey];
+  if (!slot.duration) {
+    return;
+  }
+
+  const nextTimelineTime = clamp(slotTime, 0, slot.duration) + slot.offsetSeconds;
+  seekTo(nextTimelineTime);
+}
+
+function bindScrubberGesture(element, scrubberKey) {
+  const releaseScrubber = () => {
+    if (state.activeScrubber === scrubberKey) {
+      state.activeScrubber = null;
+      render();
+    }
+  };
+
+  ["pointerdown", "mousedown", "touchstart"].forEach((eventName) => {
+    element.addEventListener(eventName, () => {
+      state.activeScrubber = scrubberKey;
+    });
+  });
+
+  ["pointerup", "mouseup", "touchend", "touchcancel", "change", "blur"].forEach((eventName) => {
+    element.addEventListener(eventName, releaseScrubber);
+  });
 }
 
 function getSlotTargetTime(slot, timelineTime) {
