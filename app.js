@@ -34,6 +34,7 @@ const elements = {
   state.slots[slotKey].elements = {
     fileInput: document.getElementById(`${prefix}FileInput`),
     video: document.getElementById(`${prefix}Video`),
+    dropZone: document.querySelector(`[data-drop-zone="${prefix}"]`),
     fileName: document.getElementById(`${prefix}FileName`),
     timeReadout: document.getElementById(`${prefix}TimeReadout`),
     offsetInput: document.getElementById(`${prefix}OffsetInput`),
@@ -106,6 +107,7 @@ function bindSlotEvents(slotKey) {
   const {
     fileInput,
     video,
+    dropZone,
     offsetInput,
     addTagButton,
     clearTagsButton,
@@ -143,6 +145,39 @@ function bindSlotEvents(slotKey) {
       pausePlayback();
       seekTo(state.duration);
     }
+  });
+
+  ["dragenter", "dragover"].forEach((eventName) => {
+    dropZone.addEventListener(eventName, (event) => {
+      if (!isFileDrag(event.dataTransfer)) {
+        return;
+      }
+      event.preventDefault();
+      dropZone.classList.add("drag-active");
+    });
+  });
+
+  ["dragleave", "dragend"].forEach((eventName) => {
+    dropZone.addEventListener(eventName, (event) => {
+      if (event.relatedTarget && dropZone.contains(event.relatedTarget)) {
+        return;
+      }
+      dropZone.classList.remove("drag-active");
+    });
+  });
+
+  dropZone.addEventListener("drop", async (event) => {
+    event.preventDefault();
+    dropZone.classList.remove("drag-active");
+
+    const file = getFirstVideoFile(event.dataTransfer);
+    if (!file) {
+      state.statusMessage = `Drop a video file into the ${slotKey} slot.`;
+      render();
+      return;
+    }
+
+    await loadFileIntoSlot(slotKey, file);
   });
 
   offsetInput.addEventListener("change", (event) => {
@@ -475,6 +510,16 @@ function readSlotState(slotKey, fileKey) {
 
 function createFileKey(file) {
   return [file.name, file.size, file.lastModified].join("__");
+}
+
+function getFirstVideoFile(dataTransfer) {
+  const files = Array.from(dataTransfer?.files || []);
+  return files.find((file) => file.type.startsWith("video/")) ?? null;
+}
+
+function isFileDrag(dataTransfer) {
+  const types = Array.from(dataTransfer?.types || []);
+  return types.includes("Files");
 }
 
 function getSlotTargetTime(slot, timelineTime) {

@@ -191,6 +191,13 @@ input[type="range"] {
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(0, 0, 0, 0.34));
   border-radius: 18px;
   border: 1px solid var(--line);
+  transition: border-color 120ms ease, box-shadow 120ms ease, transform 120ms ease;
+}
+
+.video-frame.drag-active {
+  border-color: rgba(109, 211, 199, 0.9);
+  box-shadow: inset 0 0 0 1px rgba(109, 211, 199, 0.42), 0 0 0 6px rgba(109, 211, 199, 0.12);
+  transform: translateY(-1px);
 }
 
 video {
@@ -198,6 +205,31 @@ video {
   height: 100%;
   object-fit: contain;
   background: #070b11;
+}
+
+.drop-hint {
+  position: absolute;
+  inset: 18px;
+  display: grid;
+  place-items: center;
+  border: 1px dashed rgba(174, 198, 255, 0.3);
+  border-radius: 14px;
+  color: rgba(237, 242, 255, 0.62);
+  background: rgba(7, 11, 17, 0.18);
+  letter-spacing: 0.04em;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 120ms ease, border-color 120ms ease, background 120ms ease;
+}
+
+.video-frame:hover .drop-hint,
+.video-frame.drag-active .drop-hint {
+  opacity: 1;
+}
+
+.video-frame.drag-active .drop-hint {
+  border-color: rgba(109, 211, 199, 0.82);
+  background: rgba(109, 211, 199, 0.08);
 }
 
 .video-overlay {
