@@ -251,7 +251,7 @@ video {
   transition: opacity 120ms ease, border-color 120ms ease, background 120ms ease;
 }
 
-.video-frame:hover .drop-hint,
+.video-frame:hover:not(.has-video) .drop-hint,
 .video-frame.drag-active .drop-hint {
   opacity: 1;
 }

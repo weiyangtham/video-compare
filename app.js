@@ -511,6 +511,7 @@ function render() {
     slot.elements.timelineRange.max = String(slot.duration || 0.01);
     slot.elements.zoomReadout.textContent = `${Math.round(slot.zoomScale * 100)}%`;
     slot.elements.videoStage.style.transform = `translate(${slot.panX}px, ${slot.panY}px) scale(${slot.zoomScale})`;
+    slot.elements.dropZone.classList.toggle("has-video", Boolean(slot.file));
     slot.elements.dropZone.classList.toggle("zoomed", slot.zoomScale > 1.001);
     slot.elements.dropZone.classList.toggle("is-panning", state.activePan?.slotKey === slot.slotKey);
     if (state.activeScrubber !== slot.slotKey) {
