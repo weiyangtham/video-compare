@@ -1,6 +1,7 @@
 const STORAGE_PREFIX = "video-compare/v1";
 
 const state = {
+  mode: "compare",
   timelineTime: 0,
   playing: false,
   duration: 0,
@@ -18,6 +19,7 @@ const state = {
 };
 
 const elements = {
+  appShell: document.getElementById("appShell"),
   statusBanner: document.getElementById("statusBanner"),
   playPauseButton: document.getElementById("playPauseButton"),
   stepBackButton: document.getElementById("stepBackButton"),
@@ -25,9 +27,11 @@ const elements = {
   setLoopStartButton: document.getElementById("setLoopStartButton"),
   setLoopEndButton: document.getElementById("setLoopEndButton"),
   clearLoopButton: document.getElementById("clearLoopButton"),
+  modeToggleButton: document.getElementById("modeToggleButton"),
   timelineRange: document.getElementById("timelineRange"),
   timeReadout: document.getElementById("timeReadout"),
   loopReadout: document.getElementById("loopReadout"),
+  leftPanelTitle: document.getElementById("leftPanelTitle"),
 };
 
 ["left", "right"].forEach((slotKey) => {
@@ -65,6 +69,7 @@ function createSlotState(slotKey) {
 }
 
 function init() {
+  loadModeState();
   bindGlobalEvents();
   bindSlotEvents("left");
   bindSlotEvents("right");
@@ -97,6 +102,7 @@ function bindGlobalEvents() {
     persistTransportState();
     render();
   });
+  elements.modeToggleButton.addEventListener("click", toggleMode);
   elements.timelineRange.addEventListener("input", (event) => {
     const value = Number(event.target.value);
     pausePlayback();
@@ -384,6 +390,10 @@ function addTag(slotKey) {
 }
 
 function render() {
+  const isSingleMode = state.mode === "single";
+  elements.appShell.classList.toggle("single-mode", isSingleMode);
+  elements.modeToggleButton.textContent = isSingleMode ? "Compare Mode" : "Single Video Mode";
+  elements.leftPanelTitle.textContent = isSingleMode ? "Video" : "Left Video";
   elements.timelineRange.max = String(state.duration || 0);
   if (state.activeScrubber !== "shared") {
     elements.timelineRange.value = String(clamp(state.timelineTime, 0, state.duration || 0));
@@ -476,6 +486,15 @@ function persistTransportState() {
   );
 }
 
+function persistModeState() {
+  localStorage.setItem(`${STORAGE_PREFIX}/mode`, state.mode);
+}
+
+function loadModeState() {
+  const savedMode = localStorage.getItem(`${STORAGE_PREFIX}/mode`);
+  state.mode = savedMode === "single" ? "single" : "compare";
+}
+
 function loadTransportState() {
   const raw = localStorage.getItem(`${STORAGE_PREFIX}/transport`);
   if (!raw) {
@@ -490,6 +509,12 @@ function loadTransportState() {
     state.loopStart = null;
     state.loopEnd = null;
   }
+}
+
+function toggleMode() {
+  state.mode = state.mode === "single" ? "compare" : "single";
+  persistModeState();
+  render();
 }
 
 function persistSlotState(slotKey) {

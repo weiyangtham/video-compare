@@ -170,6 +170,14 @@ input[type="range"] {
   gap: 20px;
 }
 
+.app-shell.single-mode .video-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.app-shell.single-mode [data-slot="right"] {
+  display: none;
+}
+
 .panel {
   padding: 18px;
   display: grid;
