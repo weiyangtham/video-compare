@@ -209,18 +209,6 @@ button.ghost {
   color: var(--warn);
 }
 
-.timeline-block {
-  display: grid;
-  gap: 10px;
-}
-
-.timeline-block label,
-.control-grid label {
-  display: grid;
-  gap: 8px;
-  color: var(--muted);
-}
-
 input[type="range"] {
   width: 100%;
   cursor: pointer;
@@ -239,7 +227,6 @@ input[type="range"] {
   border: 0;
 }
 
-.timeline-meta,
 .video-overlay {
   display: flex;
   justify-content: space-between;
@@ -638,7 +625,6 @@ textarea {
 @media (max-width: 980px) {
   .hero,
   .panel-header,
-  .timeline-meta,
   .transport-group-header {
     align-items: start;
     flex-direction: column;

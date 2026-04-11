@@ -31,8 +31,6 @@ const elements = {
   setLoopEndButton: document.getElementById("setLoopEndButton"),
   clearLoopButton: document.getElementById("clearLoopButton"),
   modeToggleButton: document.getElementById("modeToggleButton"),
-  timelineRange: document.getElementById("timelineRange"),
-  timeReadout: document.getElementById("timeReadout"),
   loopReadout: document.getElementById("loopReadout"),
   leftPanelTitle: document.getElementById("leftPanelTitle"),
   rightPanelTitle: document.getElementById("rightPanelTitle"),
@@ -47,8 +45,6 @@ const elements = {
     dropZone: document.querySelector(`[data-drop-zone="${prefix}"]`),
     fileName: document.getElementById(`${prefix}FileName`),
     timeReadout: document.getElementById(`${prefix}TimeReadout`),
-    offsetInput: document.getElementById(`${prefix}OffsetInput`),
-    currentTimeOutput: document.getElementById(`${prefix}CurrentTime`),
     timelineRange: document.getElementById(`${prefix}TimelineRange`),
     inlinePlayButton: document.getElementById(`${prefix}InlinePlayButton`),
     zoomInButton: document.getElementById(`${prefix}ZoomInButton`),
@@ -72,7 +68,6 @@ function createSlotState(slotKey) {
     fileKey: null,
     objectUrl: null,
     duration: 0,
-    offsetSeconds: 0,
     zoomScale: 1,
     panX: 0,
     panY: 0,
@@ -119,14 +114,8 @@ function bindGlobalEvents() {
     render();
   });
   elements.modeToggleButton.addEventListener("click", toggleMode);
-  elements.timelineRange.addEventListener("input", (event) => {
-    const value = Number(event.target.value);
-    pausePlayback();
-    seekTo(value);
-  });
   document.addEventListener("click", handleDocumentClick);
   document.addEventListener("keydown", handleDocumentKeydown);
-  bindScrubberGesture(elements.timelineRange, "shared");
 }
 
 function bindSlotEvents(slotKey) {
@@ -135,7 +124,6 @@ function bindSlotEvents(slotKey) {
     fileInput,
     video,
     dropZone,
-    offsetInput,
     timelineRange,
     inlinePlayButton,
     zoomInButton,
@@ -211,14 +199,6 @@ function bindSlotEvents(slotKey) {
     }
 
     await loadFileIntoSlot(slotKey, file);
-  });
-
-  offsetInput.addEventListener("change", (event) => {
-    slot.offsetSeconds = normalizeNumber(event.target.value, 0);
-    persistSlotState(slotKey);
-    recalculateSharedDuration();
-    seekTo(state.timelineTime);
-    render();
   });
 
   timelineRange.addEventListener("input", (event) => {
@@ -336,7 +316,6 @@ async function loadFileIntoSlot(slotKey, file) {
   slot.duration = 0;
 
   const savedState = readSlotState(slotKey, slot.fileKey);
-  slot.offsetSeconds = savedState.offsetSeconds;
   slot.zoomScale = savedState.zoomScale;
   slot.panX = savedState.panX;
   slot.panY = savedState.panY;
@@ -344,7 +323,6 @@ async function loadFileIntoSlot(slotKey, file) {
   video.src = slot.objectUrl;
   video.load();
   slot.elements.fileName.textContent = file.name;
-  slot.elements.offsetInput.value = String(slot.offsetSeconds);
   state.statusMessage = `Loading ${file.name} into the ${slotKey} slot...`;
   render();
 }
@@ -481,26 +459,20 @@ function render() {
   elements.modeToggleButton.textContent = isCompareMode ? "Disable Compare" : "Enable Compare";
   elements.leftPanelTitle.textContent = isCompareMode ? "Primary Video" : "Video";
   elements.rightPanelTitle.textContent = "Compare Video";
-  elements.timelineRange.max = String(state.duration || 0);
-  if (state.activeScrubber !== "shared") {
-    elements.timelineRange.value = String(clamp(state.timelineTime, 0, state.duration || 0));
-  }
   if (elements.playPauseButton) {
     elements.playPauseButton.textContent = state.playing ? "Pause" : "Play";
   }
   elements.playbackRateSelect.value = String(state.playbackRate);
-  elements.timeReadout.textContent = `${formatTime(state.timelineTime)} / ${formatTime(state.duration)}`;
   elements.loopReadout.textContent = hasLoop()
     ? `Loop: ${formatTime(state.loopStart)} to ${formatTime(state.loopEnd)}`
     : "Loop: Off";
 
   Object.values(state.slots).forEach((slot) => {
-    const slotTime = clamp(state.timelineTime - slot.offsetSeconds, 0, slot.duration || 0);
+    const slotTime = clamp(state.timelineTime, 0, slot.duration || 0);
     const scrubberProgress = slot.duration ? (slotTime / slot.duration) * 100 : 0;
     const boundedPan = clampPan(slot, slot.panX, slot.panY);
     slot.panX = boundedPan.x;
     slot.panY = boundedPan.y;
-    slot.elements.currentTimeOutput.textContent = formatTime(slotTime);
     slot.elements.timeReadout.textContent = formatTime(slotTime);
     slot.elements.timelineRange.max = String(slot.duration || 0.01);
     slot.elements.timelineRange.style.setProperty("--range-progress", `${scrubberProgress}%`);
@@ -533,7 +505,7 @@ function render() {
 function recalculateSharedDuration() {
   const durations = getActiveSlots()
     .filter((slot) => slot.duration > 0)
-    .map((slot) => slot.duration + Math.max(slot.offsetSeconds, 0));
+    .map((slot) => slot.duration);
 
   state.duration = durations.length ? Math.max(...durations) : 0;
   state.timelineTime = clamp(state.timelineTime, 0, state.duration);
@@ -621,7 +593,6 @@ function persistSlotState(slotKey) {
   localStorage.setItem(
     `${STORAGE_PREFIX}/${slotKey}/${slot.fileKey}`,
     JSON.stringify({
-      offsetSeconds: slot.offsetSeconds,
       zoomScale: slot.zoomScale,
       panX: slot.panX,
       panY: slot.panY,
@@ -638,7 +609,6 @@ function readSlotState(slotKey, fileKey) {
   try {
     const parsed = JSON.parse(raw);
     return {
-      offsetSeconds: normalizeNumber(parsed.offsetSeconds, 0),
       zoomScale: normalizeZoomScale(parsed.zoomScale),
       panX: normalizeNumber(parsed.panX, 0),
       panY: normalizeNumber(parsed.panY, 0),
@@ -668,7 +638,7 @@ function seekSlotToTime(slotKey, slotTime) {
     return;
   }
 
-  const nextTimelineTime = clamp(slotTime, 0, slot.duration) + slot.offsetSeconds;
+  const nextTimelineTime = clamp(slotTime, 0, slot.duration);
   seekTo(nextTimelineTime);
 }
 
@@ -709,11 +679,11 @@ function setPlaybackRate(nextRate) {
 }
 
 function getSlotTargetTime(slot, timelineTime) {
-  return clamp(timelineTime - slot.offsetSeconds, 0, slot.duration);
+  return clamp(timelineTime, 0, slot.duration);
 }
 
 function isSlotActiveAtTimelineTime(slot, timelineTime) {
-  return timelineTime >= slot.offsetSeconds && timelineTime <= slot.offsetSeconds + slot.duration;
+  return timelineTime <= slot.duration;
 }
 
 function buildStatusText() {
@@ -739,7 +709,7 @@ function buildStatusText() {
 }
 
 function clearSlotMedia(slot) {
-  const { video, fileName, timeReadout, currentTimeOutput } = slot.elements;
+  const { video, fileName, timeReadout } = slot.elements;
 
   if (slot.objectUrl) {
     URL.revokeObjectURL(slot.objectUrl);
@@ -758,7 +728,6 @@ function clearSlotMedia(slot) {
 
   fileName.textContent = "No file selected";
   timeReadout.textContent = "00:00.00";
-  currentTimeOutput.textContent = "00:00.00";
 }
 
 function getActiveSlots() {
@@ -839,7 +808,6 @@ function clampPan(slot, panX, panY) {
 
 function defaultSlotPersistence() {
   return {
-    offsetSeconds: 0,
     zoomScale: 1,
     panX: 0,
     panY: 0,
