@@ -23,9 +23,6 @@ const state = {
 const elements = {
   appShell: document.getElementById("appShell"),
   statusBanner: document.getElementById("statusBanner"),
-  playPauseButton: document.getElementById("playPauseButton"),
-  stepBackButton: document.getElementById("stepBackButton"),
-  stepForwardButton: document.getElementById("stepForwardButton"),
   playbackRateSelect: document.getElementById("playbackRateSelect"),
   loopActionButtons: Array.from(document.querySelectorAll("[data-loop-action]")),
   modeToggleButton: document.getElementById("modeToggleButton"),
@@ -44,6 +41,8 @@ const elements = {
     timeReadout: document.getElementById(`${prefix}TimeReadout`),
     timelineRange: document.getElementById(`${prefix}TimelineRange`),
     inlinePlayButton: document.getElementById(`${prefix}InlinePlayButton`),
+    stepBackButton: document.getElementById(`${prefix}StepBackButton`),
+    stepForwardButton: document.getElementById(`${prefix}StepForwardButton`),
     zoomInButton: document.getElementById(`${prefix}ZoomInButton`),
     zoomOutButton: document.getElementById(`${prefix}ZoomOutButton`),
     zoomResetButton: document.getElementById(`${prefix}ZoomResetButton`),
@@ -83,9 +82,6 @@ function init() {
 }
 
 function bindGlobalEvents() {
-  elements.playPauseButton?.addEventListener("click", togglePlayback);
-  elements.stepBackButton?.addEventListener("click", () => seekTo(state.timelineTime - 1));
-  elements.stepForwardButton?.addEventListener("click", () => seekTo(state.timelineTime + 1));
   elements.playbackRateSelect.addEventListener("change", (event) => {
     setPlaybackRate(Number(event.target.value));
   });
@@ -123,6 +119,8 @@ function bindSlotEvents(slotKey) {
     dropZone,
     timelineRange,
     inlinePlayButton,
+    stepBackButton,
+    stepForwardButton,
     zoomInButton,
     zoomOutButton,
     zoomResetButton,
@@ -204,6 +202,8 @@ function bindSlotEvents(slotKey) {
   });
   bindScrubberGesture(timelineRange, slotKey);
   inlinePlayButton.addEventListener("click", togglePlayback);
+  stepBackButton.addEventListener("click", () => seekTo(state.timelineTime - 1));
+  stepForwardButton.addEventListener("click", () => seekTo(state.timelineTime + 1));
 
   zoomInButton.addEventListener("click", () => adjustZoom(slotKey, ZOOM_STEP));
   zoomOutButton.addEventListener("click", () => adjustZoom(slotKey, -ZOOM_STEP));
@@ -459,9 +459,6 @@ function render() {
   elements.modeToggleButton.classList.toggle("ghost", !isCompareMode);
   elements.leftPanelTitle.textContent = isCompareMode ? "Primary Video" : "Video";
   elements.rightPanelTitle.textContent = "Compare Video";
-  if (elements.playPauseButton) {
-    elements.playPauseButton.textContent = state.playing ? "Pause" : "Play";
-  }
   elements.playbackRateSelect.value = String(state.playbackRate);
 
   Object.values(state.slots).forEach((slot) => {
@@ -480,6 +477,8 @@ function render() {
       `${state.playing ? "Pause" : "Play"} synced videos`
     );
     slot.elements.inlinePlayButton.disabled = !state.duration;
+    slot.elements.stepBackButton.disabled = !state.duration;
+    slot.elements.stepForwardButton.disabled = !state.duration;
     slot.elements.settingsButton.disabled = !state.duration;
     slot.elements.settingsButton.setAttribute("aria-expanded", String(state.openSettingsSlot === slot.slotKey));
     slot.elements.settingsMenu.hidden = state.openSettingsSlot !== slot.slotKey;
