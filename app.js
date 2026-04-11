@@ -223,7 +223,7 @@ function bindSlotEvents(slotKey) {
   dropZone.addEventListener(
     "wheel",
     (event) => {
-      if (!slot.file) {
+      if (!slot.file || !event.altKey) {
         return;
       }
       event.preventDefault();
