@@ -56,6 +56,7 @@ const elements = {
     playbackRateButtons: Array.from(
       document.querySelectorAll(`#${prefix}SettingsMenu [data-playback-rate]`)
     ),
+    scrubberTrack: document.querySelector(`[data-slot="${prefix}"] .video-scrubber-track`),
   };
 });
 
@@ -466,9 +467,7 @@ function render() {
     elements.playPauseButton.textContent = state.playing ? "Pause" : "Play";
   }
   elements.playbackRateSelect.value = String(state.playbackRate);
-  elements.loopReadout.textContent = hasLoop()
-    ? `Loop: ${formatTime(state.loopStart)} to ${formatTime(state.loopEnd)}`
-    : "Loop: Off";
+  elements.loopReadout.textContent = getLoopReadoutText();
 
   Object.values(state.slots).forEach((slot) => {
     const slotTime = clamp(state.timelineTime, 0, slot.duration || 0);
@@ -479,6 +478,7 @@ function render() {
     slot.elements.timeReadout.textContent = formatTime(slotTime);
     slot.elements.timelineRange.max = String(slot.duration || 0.01);
     slot.elements.timelineRange.style.setProperty("--range-progress", `${scrubberProgress}%`);
+    applyLoopTrackVisual(slot);
     slot.elements.inlinePlayButton.textContent = state.playing ? "❚❚" : "▶";
     slot.elements.inlinePlayButton.setAttribute(
       "aria-label",
@@ -701,7 +701,15 @@ function buildStatusText() {
   }
 
   if (hasLoop()) {
-    return `Looping is ready from ${formatTime(state.loopStart)} to ${formatTime(state.loopEnd)}.`;
+    return `Looping ${formatTime(state.loopStart)} to ${formatTime(state.loopEnd)}. The highlighted timeline region will replay.`;
+  }
+
+  if (state.loopStart !== null) {
+    return `Loop start set at ${formatTime(state.loopStart)}. Set an end point to finish the loop.`;
+  }
+
+  if (state.loopEnd !== null) {
+    return `Loop end set at ${formatTime(state.loopEnd)}. Set a start point to define the loop.`;
   }
 
   if (state.mode === "compare" && loadedCount === 1) {
@@ -849,6 +857,43 @@ function capitalize(value) {
 
 function hasLoop() {
   return state.loopStart !== null && state.loopEnd !== null && state.loopEnd > state.loopStart;
+}
+
+function getLoopReadoutText() {
+  if (hasLoop()) {
+    return `Looping ${formatTime(state.loopStart)} to ${formatTime(state.loopEnd)}`;
+  }
+
+  if (state.loopStart !== null) {
+    return `Start set at ${formatTime(state.loopStart)}`;
+  }
+
+  if (state.loopEnd !== null) {
+    return `End set at ${formatTime(state.loopEnd)}`;
+  }
+
+  return "Loop off";
+}
+
+function applyLoopTrackVisual(slot) {
+  const track = slot.elements.scrubberTrack;
+  if (!track) {
+    return;
+  }
+
+  const hasDuration = slot.duration > 0;
+  const startPercent = hasDuration && state.loopStart !== null
+    ? clamp((state.loopStart / slot.duration) * 100, 0, 100)
+    : 0;
+  const endPercent = hasDuration && state.loopEnd !== null
+    ? clamp((state.loopEnd / slot.duration) * 100, 0, 100)
+    : 100;
+
+  track.style.setProperty("--loop-start", `${startPercent}%`);
+  track.style.setProperty("--loop-end", `${endPercent}%`);
+  track.classList.toggle("has-loop-start", hasDuration && state.loopStart !== null);
+  track.classList.toggle("has-loop-end", hasDuration && state.loopEnd !== null);
+  track.classList.toggle("has-active-loop", hasDuration && hasLoop());
 }
 
 function formatTime(totalSeconds) {

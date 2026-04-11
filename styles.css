@@ -183,6 +183,7 @@ h1 {
   border: 1px solid rgba(174, 198, 255, 0.12);
   color: var(--text);
   white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
 .speed-control {
@@ -442,6 +443,8 @@ video {
 }
 
 .video-scrubber input[type="range"] {
+  position: relative;
+  z-index: 2;
   display: block;
   margin: 0;
   height: 18px;
@@ -495,6 +498,106 @@ video {
   border-radius: 50%;
   background: var(--accent);
   box-shadow: 0 0 0 2px rgba(7, 11, 17, 0.68);
+}
+
+.video-scrubber-track {
+  position: relative;
+  --loop-start: 0%;
+  --loop-end: 100%;
+}
+
+.loop-visual {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.loop-visual-segment {
+  position: absolute;
+  top: 7px;
+  height: 4px;
+  border-radius: 999px;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.loop-visual-segment-before,
+.loop-visual-segment-after {
+  background: rgba(7, 11, 17, 0.48);
+}
+
+.loop-visual-segment-active {
+  background: linear-gradient(90deg, rgba(240, 179, 107, 0.78), rgba(109, 211, 199, 0.85));
+  box-shadow: 0 0 0 1px rgba(240, 179, 107, 0.22);
+}
+
+.video-scrubber-track.has-active-loop .loop-visual-segment {
+  opacity: 1;
+}
+
+.video-scrubber-track.has-active-loop .loop-visual-segment-before {
+  left: 0;
+  width: var(--loop-start);
+}
+
+.video-scrubber-track.has-active-loop .loop-visual-segment-active {
+  left: var(--loop-start);
+  width: calc(var(--loop-end) - var(--loop-start));
+}
+
+.video-scrubber-track.has-active-loop .loop-visual-segment-after {
+  left: var(--loop-end);
+  width: calc(100% - var(--loop-end));
+}
+
+.loop-marker {
+  position: absolute;
+  top: -16px;
+  bottom: -2px;
+  width: 0;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.video-scrubber-track.has-loop-start .loop-marker-start,
+.video-scrubber-track.has-loop-end .loop-marker-end {
+  opacity: 1;
+}
+
+.loop-marker-start {
+  left: var(--loop-start);
+}
+
+.loop-marker-end {
+  left: var(--loop-end);
+}
+
+.loop-marker::before {
+  content: "";
+  position: absolute;
+  left: -1px;
+  top: 12px;
+  bottom: 3px;
+  width: 2px;
+  border-radius: 999px;
+  background: rgba(240, 243, 255, 0.72);
+}
+
+.loop-marker span {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  transform: translateX(-50%);
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(7, 11, 17, 0.88);
+  border: 1px solid rgba(174, 198, 255, 0.2);
+  color: var(--text);
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .video-toolbar {
