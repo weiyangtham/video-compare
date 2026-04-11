@@ -75,6 +75,13 @@
                 <span id="leftFileName">No file selected</span>
                 <span id="leftTimeReadout">00:00.00</span>
               </div>
+              <div class="video-scrubber">
+                <button id="leftInlinePlayButton" type="button" class="inline-play-button" aria-label="Play synced videos"></button>
+                <div class="video-scrubber-track">
+                  <label class="sr-only" for="leftTimelineRange">Left Video Progress</label>
+                  <input id="leftTimelineRange" type="range" min="0" max="0" step="0.01" value="0" />
+                </div>
+              </div>
             </div>
 
             <div class="control-grid">
@@ -88,27 +95,30 @@
               </label>
             </div>
 
-            <div class="slot-timeline">
-              <label for="leftTimelineRange">Left Video Progress</label>
-              <input id="leftTimelineRange" type="range" min="0" max="0" step="0.01" value="0" />
-            </div>
-
             <div class="tag-editor">
               <h3>Add Tag</h3>
+              <p class="tag-editor-copy">Use a quick tag for common moments, or add an optional custom label.</p>
+              <div class="quick-tag-row" data-slot-quick-tags="left">
+                <button type="button" class="quick-tag-button" data-tag-template="Start">Start</button>
+                <button type="button" class="quick-tag-button" data-tag-template="Issue">Issue</button>
+                <button type="button" class="quick-tag-button" data-tag-template="Check">Check</button>
+                <button type="button" class="quick-tag-button" data-tag-template="Finish">Finish</button>
+              </div>
               <label>
-                Label
+                Custom Label (optional)
                 <input id="leftTagLabel" type="text" maxlength="80" placeholder="Sprint start" />
               </label>
               <label>
-                Notes
+                Notes (optional)
                 <textarea id="leftTagNotes" rows="3" placeholder="What stands out in this moment?"></textarea>
               </label>
-              <button id="leftAddTagButton">Add Tag At Current Time</button>
+              <p class="tag-editor-hint">Press Enter in the label field, or Cmd/Ctrl + Enter in notes, to save.</p>
+              <button id="leftAddTagButton">Save Tag At Current Time</button>
             </div>
 
             <div class="tag-list-block">
               <div class="tag-list-header">
-                <h3>Tags</h3>
+                <h3>Tags <span id="leftTagCount" class="tag-count">0</span></h3>
                 <button id="leftClearTagsButton" class="ghost">Clear Saved Tags</button>
               </div>
               <div id="leftTags" class="tag-list empty">No tags yet.</div>
@@ -139,6 +149,13 @@
                 <span id="rightFileName">No file selected</span>
                 <span id="rightTimeReadout">00:00.00</span>
               </div>
+              <div class="video-scrubber">
+                <button id="rightInlinePlayButton" type="button" class="inline-play-button" aria-label="Play synced videos"></button>
+                <div class="video-scrubber-track">
+                  <label class="sr-only" for="rightTimelineRange">Right Video Progress</label>
+                  <input id="rightTimelineRange" type="range" min="0" max="0" step="0.01" value="0" />
+                </div>
+              </div>
             </div>
 
             <div class="control-grid">
@@ -152,27 +169,30 @@
               </label>
             </div>
 
-            <div class="slot-timeline">
-              <label for="rightTimelineRange">Right Video Progress</label>
-              <input id="rightTimelineRange" type="range" min="0" max="0" step="0.01" value="0" />
-            </div>
-
             <div class="tag-editor">
               <h3>Add Tag</h3>
+              <p class="tag-editor-copy">Use a quick tag for common moments, or add an optional custom label.</p>
+              <div class="quick-tag-row" data-slot-quick-tags="right">
+                <button type="button" class="quick-tag-button" data-tag-template="Start">Start</button>
+                <button type="button" class="quick-tag-button" data-tag-template="Issue">Issue</button>
+                <button type="button" class="quick-tag-button" data-tag-template="Check">Check</button>
+                <button type="button" class="quick-tag-button" data-tag-template="Finish">Finish</button>
+              </div>
               <label>
-                Label
+                Custom Label (optional)
                 <input id="rightTagLabel" type="text" maxlength="80" placeholder="Sprint start" />
               </label>
               <label>
-                Notes
+                Notes (optional)
                 <textarea id="rightTagNotes" rows="3" placeholder="What stands out in this moment?"></textarea>
               </label>
-              <button id="rightAddTagButton">Add Tag At Current Time</button>
+              <p class="tag-editor-hint">Press Enter in the label field, or Cmd/Ctrl + Enter in notes, to save.</p>
+              <button id="rightAddTagButton">Save Tag At Current Time</button>
             </div>
 
             <div class="tag-list-block">
               <div class="tag-list-header">
-                <h3>Tags</h3>
+                <h3>Tags <span id="rightTagCount" class="tag-count">0</span></h3>
                 <button id="rightClearTagsButton" class="ghost">Clear Saved Tags</button>
               </div>
               <div id="rightTags" class="tag-list empty">No tags yet.</div>

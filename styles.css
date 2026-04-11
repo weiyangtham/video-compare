@@ -150,7 +150,6 @@ button.ghost {
 }
 
 .timeline-block label,
-.slot-timeline label,
 .control-grid label,
 .tag-editor label {
   display: grid;
@@ -162,6 +161,18 @@ input[type="range"] {
   width: 100%;
   cursor: pointer;
   accent-color: var(--accent);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .timeline-meta,
@@ -263,12 +274,119 @@ video {
 
 .video-overlay {
   position: absolute;
-  inset: auto 12px 12px;
+  inset: auto 12px 44px;
   padding: 8px 10px;
   border-radius: 12px;
   background: rgba(5, 8, 14, 0.76);
   color: var(--muted);
   font-size: 0.92rem;
+  z-index: 2;
+}
+
+.video-scrubber {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  z-index: 3;
+  padding: 10px 8px 8px;
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(5, 8, 14, 0), rgba(5, 8, 14, 0.82));
+  opacity: 0.82;
+  transition: opacity 140ms ease;
+}
+
+.inline-play-button {
+  width: 34px;
+  min-width: 34px;
+  height: 34px;
+  padding: 0;
+  border-radius: 999px;
+  background: rgba(7, 11, 17, 0.78);
+  border: 1px solid rgba(174, 198, 255, 0.22);
+  color: var(--text);
+  font-size: 0.95rem;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+}
+
+.inline-play-button:disabled {
+  opacity: 0.45;
+  cursor: default;
+  transform: none;
+}
+
+.video-scrubber-track {
+  flex: 1;
+  min-width: 0;
+}
+
+.video-frame:hover .video-scrubber,
+.video-frame:focus-within .video-scrubber,
+.video-frame.has-video .video-scrubber {
+  opacity: 1;
+}
+
+.video-scrubber input[type="range"] {
+  display: block;
+  margin: 0;
+  height: 18px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  --range-progress: 0%;
+}
+
+.video-scrubber input[type="range"]::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    var(--accent) 0%,
+    var(--accent) var(--range-progress),
+    rgba(255, 255, 255, 0.24) var(--range-progress),
+    rgba(255, 255, 255, 0.24) 100%
+  );
+}
+
+.video-scrubber input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  margin-top: -4px;
+  border: none;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 2px rgba(7, 11, 17, 0.68);
+}
+
+.video-scrubber input[type="range"]::-moz-range-track {
+  height: 4px;
+  border: none;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    var(--accent) 0%,
+    var(--accent) var(--range-progress),
+    rgba(255, 255, 255, 0.24) var(--range-progress),
+    rgba(255, 255, 255, 0.24) 100%
+  );
+}
+
+.video-scrubber input[type="range"]::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border: none;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 2px rgba(7, 11, 17, 0.68);
 }
 
 .zoom-controls {
@@ -315,11 +433,6 @@ video {
   gap: 14px;
 }
 
-.slot-timeline {
-  display: grid;
-  gap: 10px;
-}
-
 input[type="number"],
 select,
 input[type="text"],
@@ -341,6 +454,39 @@ textarea {
 .tag-list-block {
   display: grid;
   gap: 12px;
+}
+
+.tag-editor-copy,
+.tag-editor-hint {
+  margin: 0;
+  color: var(--muted);
+}
+
+.tag-editor-hint {
+  font-size: 0.92rem;
+}
+
+.quick-tag-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.quick-tag-button {
+  padding: 8px 12px;
+}
+
+.tag-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.8rem;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  background: rgba(109, 211, 199, 0.14);
+  color: var(--accent);
+  font-size: 0.9rem;
+  vertical-align: middle;
 }
 
 .tag-list {
@@ -365,7 +511,27 @@ textarea {
   display: flex;
   justify-content: space-between;
   gap: 10px;
+  align-items: start;
+}
+
+.tag-summary,
+.tag-actions {
+  display: flex;
+  gap: 10px;
   align-items: center;
+  flex-wrap: wrap;
+}
+
+.tag-title {
+  font-size: 1rem;
+}
+
+.tag-time {
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(122, 167, 255, 0.12);
+  color: #bfd2ff;
+  font-size: 0.82rem;
 }
 
 .tag-jump {
@@ -399,5 +565,9 @@ textarea {
     right: 12px;
     justify-content: space-between;
     flex-wrap: wrap;
+  }
+
+  .tag-meta {
+    flex-direction: column;
   }
 }

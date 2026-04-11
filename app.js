@@ -1,4 +1,5 @@
 const STORAGE_PREFIX = "video-compare/v1";
+const DEFAULT_TAG_LABEL = "Checkpoint";
 
 const state = {
   mode: "compare",
@@ -49,11 +50,14 @@ const elements = {
     offsetInput: document.getElementById(`${prefix}OffsetInput`),
     currentTimeOutput: document.getElementById(`${prefix}CurrentTime`),
     timelineRange: document.getElementById(`${prefix}TimelineRange`),
+    inlinePlayButton: document.getElementById(`${prefix}InlinePlayButton`),
     tagLabelInput: document.getElementById(`${prefix}TagLabel`),
     tagNotesInput: document.getElementById(`${prefix}TagNotes`),
     addTagButton: document.getElementById(`${prefix}AddTagButton`),
     clearTagsButton: document.getElementById(`${prefix}ClearTagsButton`),
     tagsContainer: document.getElementById(`${prefix}Tags`),
+    tagCount: document.getElementById(`${prefix}TagCount`),
+    quickTagButtons: document.querySelectorAll(`[data-slot-quick-tags="${prefix}"] [data-tag-template]`),
     zoomInButton: document.getElementById(`${prefix}ZoomInButton`),
     zoomOutButton: document.getElementById(`${prefix}ZoomOutButton`),
     zoomResetButton: document.getElementById(`${prefix}ZoomResetButton`),
@@ -134,8 +138,12 @@ function bindSlotEvents(slotKey) {
     dropZone,
     offsetInput,
     timelineRange,
+    inlinePlayButton,
+    tagLabelInput,
+    tagNotesInput,
     addTagButton,
     clearTagsButton,
+    quickTagButtons,
     zoomInButton,
     zoomOutButton,
     zoomResetButton,
@@ -221,6 +229,7 @@ function bindSlotEvents(slotKey) {
     seekSlotToTime(slotKey, Number(event.target.value));
   });
   bindScrubberGesture(timelineRange, slotKey);
+  inlinePlayButton.addEventListener("click", togglePlayback);
 
   zoomInButton.addEventListener("click", () => adjustZoom(slotKey, ZOOM_STEP));
   zoomOutButton.addEventListener("click", () => adjustZoom(slotKey, -ZOOM_STEP));
@@ -296,10 +305,27 @@ function bindSlotEvents(slotKey) {
   dropZone.addEventListener("pointercancel", releasePan);
 
   addTagButton.addEventListener("click", () => addTag(slotKey));
+  quickTagButtons.forEach((button) => {
+    button.addEventListener("click", () => addTag(slotKey, button.dataset.tagTemplate || ""));
+  });
+  tagLabelInput.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      addTag(slotKey);
+    }
+  });
+  tagNotesInput.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+      event.preventDefault();
+      addTag(slotKey);
+    }
+  });
   clearTagsButton.addEventListener("click", () => {
     slot.tags = [];
     persistSlotState(slotKey);
     renderTags(slotKey);
+    state.statusMessage = `Cleared saved tags from the ${slotKey} slot.`;
+    render();
   });
 }
 
@@ -453,20 +479,14 @@ function syncVideoToTimeline(slot) {
   }
 }
 
-function addTag(slotKey) {
+function addTag(slotKey, quickLabel = "") {
   const slot = state.slots[slotKey];
   if (!slot.fileKey) {
     return;
   }
 
-  const label = slot.elements.tagLabelInput.value.trim();
+  const label = slot.elements.tagLabelInput.value.trim() || quickLabel.trim() || DEFAULT_TAG_LABEL;
   const notes = slot.elements.tagNotesInput.value.trim();
-
-  if (!label) {
-    state.statusMessage = `Add a label before saving a ${slotKey} tag.`;
-    render();
-    return;
-  }
 
   const timestamp = clamp(state.timelineTime - slot.offsetSeconds, 0, slot.duration || 0);
   const tag = {
@@ -482,6 +502,7 @@ function addTag(slotKey) {
   slot.elements.tagNotesInput.value = "";
   persistSlotState(slotKey);
   renderTags(slotKey);
+  state.statusMessage = `Saved ${slotKey} tag "${tag.label}" at ${formatTime(tag.timestamp)}.`;
   render();
 }
 
@@ -503,12 +524,20 @@ function render() {
 
   Object.values(state.slots).forEach((slot) => {
     const slotTime = clamp(state.timelineTime - slot.offsetSeconds, 0, slot.duration || 0);
+    const scrubberProgress = slot.duration ? (slotTime / slot.duration) * 100 : 0;
     const boundedPan = clampPan(slot, slot.panX, slot.panY);
     slot.panX = boundedPan.x;
     slot.panY = boundedPan.y;
     slot.elements.currentTimeOutput.textContent = formatTime(slotTime);
     slot.elements.timeReadout.textContent = formatTime(slotTime);
     slot.elements.timelineRange.max = String(slot.duration || 0.01);
+    slot.elements.timelineRange.style.setProperty("--range-progress", `${scrubberProgress}%`);
+    slot.elements.inlinePlayButton.textContent = state.playing ? "❚❚" : "▶";
+    slot.elements.inlinePlayButton.setAttribute(
+      "aria-label",
+      `${state.playing ? "Pause" : "Play"} synced videos`
+    );
+    slot.elements.inlinePlayButton.disabled = !state.duration;
     slot.elements.zoomReadout.textContent = `${Math.round(slot.zoomScale * 100)}%`;
     slot.elements.videoStage.style.transform = `translate(${slot.panX}px, ${slot.panY}px) scale(${slot.zoomScale})`;
     slot.elements.dropZone.classList.toggle("has-video", Boolean(slot.file));
@@ -525,6 +554,7 @@ function render() {
 function renderTags(slotKey) {
   const slot = state.slots[slotKey];
   const container = slot.elements.tagsContainer;
+  slot.elements.tagCount.textContent = String(slot.tags.length);
 
   if (!slot.tags.length) {
     container.className = "tag-list empty";
@@ -541,8 +571,21 @@ function renderTags(slotKey) {
       const meta = document.createElement("div");
       meta.className = "tag-meta";
 
+      const summary = document.createElement("div");
+      summary.className = "tag-summary";
+
       const title = document.createElement("strong");
-      title.textContent = `${tag.label} · ${formatTime(tag.timestamp)}`;
+      title.className = "tag-title";
+      title.textContent = tag.label;
+
+      const time = document.createElement("span");
+      time.className = "tag-time";
+      time.textContent = formatTime(tag.timestamp);
+
+      summary.append(title, time);
+
+      const actions = document.createElement("div");
+      actions.className = "tag-actions";
 
       const jump = document.createElement("button");
       jump.className = "tag-jump";
@@ -554,7 +597,8 @@ function renderTags(slotKey) {
 
       const note = document.createElement("div");
       note.className = "tag-note";
-      note.textContent = tag.notes || "No notes";
+      note.textContent = tag.notes;
+      note.hidden = !tag.notes;
 
       const remove = document.createElement("button");
       remove.textContent = "Delete";
@@ -562,9 +606,12 @@ function renderTags(slotKey) {
         slot.tags = slot.tags.filter((entry) => entry.id !== tag.id);
         persistSlotState(slotKey);
         renderTags(slotKey);
+        state.statusMessage = `Deleted tag "${tag.label}" from the ${slotKey} slot.`;
+        render();
       });
 
-      meta.append(title, jump, remove);
+      actions.append(jump, remove);
+      meta.append(summary, actions);
       item.append(meta, note);
       return item;
     })
