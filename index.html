@@ -13,31 +13,46 @@
           <p class="eyebrow">Mac-friendly browser prototype</p>
           <h1>Video Compare</h1>
           <p class="hero-copy">
-            Load two local videos, scrub them together, add offsets, and loop a selected section.
+            Load a local video, scrub precisely, adjust playback, and turn on compare mode only when you need it.
           </p>
         </div>
-        <div class="hero-status" id="statusBanner">Load one or two videos to begin.</div>
+        <div class="hero-status" id="statusBanner">Load a video to begin.</div>
       </header>
 
       <main class="layout">
         <section class="transport card">
           <div class="transport-row">
-            <button id="playPauseButton" class="primary">Play</button>
-            <button id="stepBackButton">-1s</button>
-            <button id="stepForwardButton">+1s</button>
-            <label class="speed-control" for="playbackRateSelect">
-              Speed
-              <select id="playbackRateSelect">
-                <option value="0.25">0.25x</option>
-                <option value="0.5">0.5x</option>
-                <option value="0.75">0.75x</option>
-                <option value="1" selected>1x</option>
-              </select>
-            </label>
-            <button id="setLoopStartButton">Set A</button>
-            <button id="setLoopEndButton">Set B</button>
-            <button id="clearLoopButton">Clear Loop</button>
-            <button id="modeToggleButton" class="ghost">Single Video Mode</button>
+            <div class="transport-group transport-group-speed compare-only" aria-label="Playback speed controls">
+              <label class="speed-control" for="playbackRateSelect">
+                <span class="transport-label">Speed</span>
+                <select id="playbackRateSelect">
+                  <option value="0.25">0.25x</option>
+                  <option value="0.5">0.5x</option>
+                  <option value="0.75">0.75x</option>
+                  <option value="1" selected>1x</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="transport-group transport-group-loop" aria-label="Loop controls">
+              <div class="transport-group-header">
+                <div>
+                  <p class="transport-label">Loop Tools</p>
+                  <p class="transport-group-copy">Drop A and B markers, then clear when you want to reset the selection.</p>
+                </div>
+                <span id="loopReadout" class="loop-readout">Loop: Off</span>
+              </div>
+              <div class="loop-panel-actions">
+                <button id="setLoopStartButton">Set A</button>
+                <button id="setLoopEndButton">Set B</button>
+                <button id="clearLoopButton">Clear Loop</button>
+              </div>
+            </div>
+
+            <div class="transport-group transport-group-view" aria-label="View mode controls">
+              <span class="transport-label">View</span>
+              <button id="modeToggleButton" class="ghost">Enable Compare</button>
+            </div>
           </div>
 
           <div class="timeline-block">
@@ -45,7 +60,6 @@
             <input id="timelineRange" type="range" min="0" max="0" step="0.01" value="0" />
             <div class="timeline-meta">
               <span id="timeReadout">00:00.00 / 00:00.00</span>
-              <span id="loopReadout">Loop: Off</span>
             </div>
           </div>
         </section>
@@ -65,18 +79,11 @@
                 <video id="leftVideo" playsinline muted></video>
               </div>
               <div class="drop-hint" aria-hidden="true">Drop a video here</div>
-              <div class="zoom-controls" aria-label="Left video zoom controls">
-                <button id="leftZoomOutButton" type="button" class="zoom-button" aria-label="Zoom out">-</button>
-                <button id="leftZoomInButton" type="button" class="zoom-button" aria-label="Zoom in">+</button>
-                <button id="leftZoomResetButton" type="button" class="zoom-button zoom-button-wide">Reset</button>
-                <span id="leftZoomReadout" class="zoom-readout">100%</span>
-              </div>
               <div class="video-overlay">
                 <span id="leftFileName">No file selected</span>
                 <span id="leftTimeReadout">00:00.00</span>
               </div>
               <div class="video-scrubber">
-                <button id="leftInlinePlayButton" type="button" class="inline-play-button" aria-label="Play synced videos"></button>
                 <div class="video-scrubber-track">
                   <label class="sr-only" for="leftTimelineRange">Left Video Progress</label>
                   <input id="leftTimelineRange" type="range" min="0" max="0" step="0.01" value="0" />
@@ -84,8 +91,39 @@
               </div>
             </div>
 
+            <div class="video-toolbar" aria-label="Left video controls">
+              <button id="leftInlinePlayButton" type="button" class="toolbar-button toolbar-play-button" aria-label="Play synced videos"></button>
+              <div class="zoom-controls" aria-label="Left video zoom controls">
+                <button id="leftZoomOutButton" type="button" class="zoom-button" aria-label="Zoom out">-</button>
+                <button id="leftZoomInButton" type="button" class="zoom-button" aria-label="Zoom in">+</button>
+                <button id="leftZoomResetButton" type="button" class="zoom-button zoom-button-wide">Reset</button>
+                <span id="leftZoomReadout" class="zoom-readout">100%</span>
+              </div>
+              <div class="video-settings">
+                <button
+                  id="leftSettingsButton"
+                  type="button"
+                  class="toolbar-button settings-button"
+                  aria-label="Open video settings"
+                  aria-haspopup="true"
+                  aria-expanded="false"
+                >
+                  ⚙
+                </button>
+                <div id="leftSettingsMenu" class="settings-menu" hidden>
+                  <p class="settings-title">Playback speed</p>
+                  <div class="settings-option-list" role="group" aria-label="Playback speed">
+                    <button type="button" class="settings-option" data-playback-rate="0.25">0.25x</button>
+                    <button type="button" class="settings-option" data-playback-rate="0.5">0.5x</button>
+                    <button type="button" class="settings-option" data-playback-rate="0.75">0.75x</button>
+                    <button type="button" class="settings-option" data-playback-rate="1">1x</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <div class="control-grid">
-              <label>
+              <label class="offset-control compare-only">
                 Offset (seconds)
                 <input id="leftOffsetInput" type="number" step="0.1" value="0" />
               </label>
@@ -98,9 +136,9 @@
 
           <article class="card panel" data-slot="right">
             <div class="panel-header">
-              <h2>Right Video</h2>
+              <h2 id="rightPanelTitle">Compare Video</h2>
               <label class="file-picker">
-                <span>Select Video</span>
+                <span>Select Compare Video</span>
                 <input id="rightFileInput" type="file" accept="video/*" />
               </label>
             </div>
@@ -110,18 +148,11 @@
                 <video id="rightVideo" playsinline muted></video>
               </div>
               <div class="drop-hint" aria-hidden="true">Drop a video here</div>
-              <div class="zoom-controls" aria-label="Right video zoom controls">
-                <button id="rightZoomOutButton" type="button" class="zoom-button" aria-label="Zoom out">-</button>
-                <button id="rightZoomInButton" type="button" class="zoom-button" aria-label="Zoom in">+</button>
-                <button id="rightZoomResetButton" type="button" class="zoom-button zoom-button-wide">Reset</button>
-                <span id="rightZoomReadout" class="zoom-readout">100%</span>
-              </div>
               <div class="video-overlay">
                 <span id="rightFileName">No file selected</span>
                 <span id="rightTimeReadout">00:00.00</span>
               </div>
               <div class="video-scrubber">
-                <button id="rightInlinePlayButton" type="button" class="inline-play-button" aria-label="Play synced videos"></button>
                 <div class="video-scrubber-track">
                   <label class="sr-only" for="rightTimelineRange">Right Video Progress</label>
                   <input id="rightTimelineRange" type="range" min="0" max="0" step="0.01" value="0" />
@@ -129,8 +160,39 @@
               </div>
             </div>
 
+            <div class="video-toolbar" aria-label="Right video controls">
+              <button id="rightInlinePlayButton" type="button" class="toolbar-button toolbar-play-button" aria-label="Play synced videos"></button>
+              <div class="zoom-controls" aria-label="Right video zoom controls">
+                <button id="rightZoomOutButton" type="button" class="zoom-button" aria-label="Zoom out">-</button>
+                <button id="rightZoomInButton" type="button" class="zoom-button" aria-label="Zoom in">+</button>
+                <button id="rightZoomResetButton" type="button" class="zoom-button zoom-button-wide">Reset</button>
+                <span id="rightZoomReadout" class="zoom-readout">100%</span>
+              </div>
+              <div class="video-settings">
+                <button
+                  id="rightSettingsButton"
+                  type="button"
+                  class="toolbar-button settings-button"
+                  aria-label="Open video settings"
+                  aria-haspopup="true"
+                  aria-expanded="false"
+                >
+                  ⚙
+                </button>
+                <div id="rightSettingsMenu" class="settings-menu" hidden>
+                  <p class="settings-title">Playback speed</p>
+                  <div class="settings-option-list" role="group" aria-label="Playback speed">
+                    <button type="button" class="settings-option" data-playback-rate="0.25">0.25x</button>
+                    <button type="button" class="settings-option" data-playback-rate="0.5">0.5x</button>
+                    <button type="button" class="settings-option" data-playback-rate="0.75">0.75x</button>
+                    <button type="button" class="settings-option" data-playback-rate="1">1x</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <div class="control-grid">
-              <label>
+              <label class="offset-control compare-only">
                 Offset (seconds)
                 <input id="rightOffsetInput" type="number" step="0.1" value="0" />
               </label>

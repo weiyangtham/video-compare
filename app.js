@@ -1,6 +1,6 @@
 const STORAGE_PREFIX = "video-compare/v1";
 const state = {
-  mode: "compare",
+  mode: "single",
   timelineTime: 0,
   playing: false,
   playbackRate: 1,
@@ -13,6 +13,7 @@ const state = {
   timelineStartedAt: 0,
   activeScrubber: null,
   activePan: null,
+  openSettingsSlot: null,
   slots: {
     left: createSlotState("left"),
     right: createSlotState("right"),
@@ -34,6 +35,7 @@ const elements = {
   timeReadout: document.getElementById("timeReadout"),
   loopReadout: document.getElementById("loopReadout"),
   leftPanelTitle: document.getElementById("leftPanelTitle"),
+  rightPanelTitle: document.getElementById("rightPanelTitle"),
 };
 
 ["left", "right"].forEach((slotKey) => {
@@ -53,6 +55,11 @@ const elements = {
     zoomOutButton: document.getElementById(`${prefix}ZoomOutButton`),
     zoomResetButton: document.getElementById(`${prefix}ZoomResetButton`),
     zoomReadout: document.getElementById(`${prefix}ZoomReadout`),
+    settingsButton: document.getElementById(`${prefix}SettingsButton`),
+    settingsMenu: document.getElementById(`${prefix}SettingsMenu`),
+    playbackRateButtons: Array.from(
+      document.querySelectorAll(`#${prefix}SettingsMenu [data-playback-rate]`)
+    ),
   };
 });
 
@@ -83,9 +90,9 @@ function init() {
 }
 
 function bindGlobalEvents() {
-  elements.playPauseButton.addEventListener("click", togglePlayback);
-  elements.stepBackButton.addEventListener("click", () => seekTo(state.timelineTime - 1));
-  elements.stepForwardButton.addEventListener("click", () => seekTo(state.timelineTime + 1));
+  elements.playPauseButton?.addEventListener("click", togglePlayback);
+  elements.stepBackButton?.addEventListener("click", () => seekTo(state.timelineTime - 1));
+  elements.stepForwardButton?.addEventListener("click", () => seekTo(state.timelineTime + 1));
   elements.playbackRateSelect.addEventListener("change", (event) => {
     setPlaybackRate(Number(event.target.value));
   });
@@ -117,6 +124,8 @@ function bindGlobalEvents() {
     pausePlayback();
     seekTo(value);
   });
+  document.addEventListener("click", handleDocumentClick);
+  document.addEventListener("keydown", handleDocumentKeydown);
   bindScrubberGesture(elements.timelineRange, "shared");
 }
 
@@ -132,6 +141,9 @@ function bindSlotEvents(slotKey) {
     zoomInButton,
     zoomOutButton,
     zoomResetButton,
+    settingsButton,
+    settingsMenu,
+    playbackRateButtons,
   } = slot.elements;
 
   fileInput.addEventListener("change", async (event) => {
@@ -219,6 +231,19 @@ function bindSlotEvents(slotKey) {
   zoomInButton.addEventListener("click", () => adjustZoom(slotKey, ZOOM_STEP));
   zoomOutButton.addEventListener("click", () => adjustZoom(slotKey, -ZOOM_STEP));
   zoomResetButton.addEventListener("click", () => resetZoom(slotKey));
+  settingsButton.addEventListener("click", (event) => {
+    event.stopPropagation();
+    toggleSettingsMenu(slotKey);
+  });
+  settingsMenu.addEventListener("click", (event) => {
+    event.stopPropagation();
+  });
+  playbackRateButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+      setPlaybackRate(Number(button.dataset.playbackRate));
+      closeSettingsMenu();
+    });
+  });
 
   dropZone.addEventListener(
     "wheel",
@@ -248,6 +273,10 @@ function bindSlotEvents(slotKey) {
     }
 
     if (event.target.closest(".zoom-controls")) {
+      return;
+    }
+
+    if (event.target.closest(".video-toolbar")) {
       return;
     }
 
@@ -337,11 +366,15 @@ function startPlayback() {
   state.startedAtMs = performance.now();
   state.timelineStartedAt = state.timelineTime;
 
-  Object.values(state.slots).forEach((slot) => {
+  getActiveSlots().forEach((slot) => {
     if (slot.file) {
       syncVideoToTimeline(slot);
       void slot.elements.video.play().catch(() => {});
     }
+  });
+
+  getInactiveSlots().forEach((slot) => {
+    slot.elements.video.pause();
   });
 
   state.animationFrameId = requestAnimationFrame(tickPlayback);
@@ -402,7 +435,10 @@ function seekTo(nextTime) {
 }
 
 function syncAllVideos() {
-  Object.values(state.slots).forEach(syncVideoToTimeline);
+  getActiveSlots().forEach(syncVideoToTimeline);
+  getInactiveSlots().forEach((slot) => {
+    slot.elements.video.pause();
+  });
 }
 
 function syncVideoToTimeline(slot) {
@@ -439,14 +475,19 @@ function syncVideoToTimeline(slot) {
 
 function render() {
   const isSingleMode = state.mode === "single";
+  const isCompareMode = state.mode === "compare";
   elements.appShell.classList.toggle("single-mode", isSingleMode);
-  elements.modeToggleButton.textContent = isSingleMode ? "Compare Mode" : "Single Video Mode";
-  elements.leftPanelTitle.textContent = isSingleMode ? "Video" : "Left Video";
+  elements.appShell.classList.toggle("compare-mode", isCompareMode);
+  elements.modeToggleButton.textContent = isCompareMode ? "Disable Compare" : "Enable Compare";
+  elements.leftPanelTitle.textContent = isCompareMode ? "Primary Video" : "Video";
+  elements.rightPanelTitle.textContent = "Compare Video";
   elements.timelineRange.max = String(state.duration || 0);
   if (state.activeScrubber !== "shared") {
     elements.timelineRange.value = String(clamp(state.timelineTime, 0, state.duration || 0));
   }
-  elements.playPauseButton.textContent = state.playing ? "Pause" : "Play";
+  if (elements.playPauseButton) {
+    elements.playPauseButton.textContent = state.playing ? "Pause" : "Play";
+  }
   elements.playbackRateSelect.value = String(state.playbackRate);
   elements.timeReadout.textContent = `${formatTime(state.timelineTime)} / ${formatTime(state.duration)}`;
   elements.loopReadout.textContent = hasLoop()
@@ -469,6 +510,14 @@ function render() {
       `${state.playing ? "Pause" : "Play"} synced videos`
     );
     slot.elements.inlinePlayButton.disabled = !state.duration;
+    slot.elements.settingsButton.disabled = !state.duration;
+    slot.elements.settingsButton.setAttribute("aria-expanded", String(state.openSettingsSlot === slot.slotKey));
+    slot.elements.settingsMenu.hidden = state.openSettingsSlot !== slot.slotKey;
+    slot.elements.playbackRateButtons.forEach((button) => {
+      const isActive = Number(button.dataset.playbackRate) === state.playbackRate;
+      button.classList.toggle("is-active", isActive);
+      button.setAttribute("aria-pressed", String(isActive));
+    });
     slot.elements.zoomReadout.textContent = `${Math.round(slot.zoomScale * 100)}%`;
     slot.elements.videoStage.style.transform = `translate(${slot.panX}px, ${slot.panY}px) scale(${slot.zoomScale})`;
     slot.elements.dropZone.classList.toggle("has-video", Boolean(slot.file));
@@ -482,7 +531,7 @@ function render() {
   elements.statusBanner.textContent = buildStatusText();
 }
 function recalculateSharedDuration() {
-  const durations = Object.values(state.slots)
+  const durations = getActiveSlots()
     .filter((slot) => slot.duration > 0)
     .map((slot) => slot.duration + Math.max(slot.offsetSeconds, 0));
 
@@ -508,7 +557,7 @@ function persistModeState() {
 
 function loadModeState() {
   const savedMode = localStorage.getItem(`${STORAGE_PREFIX}/mode`);
-  state.mode = savedMode === "single" ? "single" : "compare";
+  state.mode = savedMode === "compare" ? "compare" : "single";
 }
 
 function loadTransportState() {
@@ -531,8 +580,36 @@ function loadTransportState() {
 
 function toggleMode() {
   state.mode = state.mode === "single" ? "compare" : "single";
+  closeSettingsMenu();
+  recalculateSharedDuration();
+  seekTo(state.timelineTime);
   persistModeState();
   render();
+}
+
+function toggleSettingsMenu(slotKey) {
+  state.openSettingsSlot = state.openSettingsSlot === slotKey ? null : slotKey;
+  render();
+}
+
+function closeSettingsMenu() {
+  if (state.openSettingsSlot === null) {
+    return;
+  }
+  state.openSettingsSlot = null;
+  render();
+}
+
+function handleDocumentClick(event) {
+  if (!event.target.closest(".video-settings")) {
+    closeSettingsMenu();
+  }
+}
+
+function handleDocumentKeydown(event) {
+  if (event.key === "Escape") {
+    closeSettingsMenu();
+  }
 }
 
 function persistSlotState(slotKey) {
@@ -644,14 +721,18 @@ function buildStatusText() {
     return state.statusMessage;
   }
 
-  const loadedCount = Object.values(state.slots).filter((slot) => slot.file).length;
+  const loadedCount = getActiveSlots().filter((slot) => slot.file).length;
 
   if (!loadedCount) {
-    return "Load one or two videos to begin.";
+    return state.mode === "compare" ? "Load one or two videos to begin." : "Load a video to begin.";
   }
 
   if (hasLoop()) {
     return `Looping is ready from ${formatTime(state.loopStart)} to ${formatTime(state.loopEnd)}.`;
+  }
+
+  if (state.mode === "compare" && loadedCount === 1) {
+    return "Primary video loaded. Add a compare video when you're ready.";
   }
 
   return `${loadedCount} video${loadedCount === 1 ? "" : "s"} loaded. Timeline duration ${formatTime(state.duration)}.`;
@@ -678,6 +759,14 @@ function clearSlotMedia(slot) {
   fileName.textContent = "No file selected";
   timeReadout.textContent = "00:00.00";
   currentTimeOutput.textContent = "00:00.00";
+}
+
+function getActiveSlots() {
+  return state.mode === "compare" ? [state.slots.left, state.slots.right] : [state.slots.left];
+}
+
+function getInactiveSlots() {
+  return state.mode === "compare" ? [] : [state.slots.right];
 }
 
 const MIN_ZOOM = 1;
