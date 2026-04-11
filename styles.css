@@ -195,6 +195,11 @@ input[type="range"] {
   display: none;
 }
 
+.app-shell.single-mode [data-slot="left"] .video-frame {
+  width: min(100%, calc(min(50vh, 720px) * 16 / 9));
+  margin-inline: auto;
+}
+
 .panel {
   padding: 18px;
   display: grid;
