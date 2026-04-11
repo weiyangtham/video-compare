@@ -1,6 +1,4 @@
 const STORAGE_PREFIX = "video-compare/v1";
-const DEFAULT_TAG_LABEL = "Checkpoint";
-
 const state = {
   mode: "compare",
   timelineTime: 0,
@@ -51,13 +49,6 @@ const elements = {
     currentTimeOutput: document.getElementById(`${prefix}CurrentTime`),
     timelineRange: document.getElementById(`${prefix}TimelineRange`),
     inlinePlayButton: document.getElementById(`${prefix}InlinePlayButton`),
-    tagLabelInput: document.getElementById(`${prefix}TagLabel`),
-    tagNotesInput: document.getElementById(`${prefix}TagNotes`),
-    addTagButton: document.getElementById(`${prefix}AddTagButton`),
-    clearTagsButton: document.getElementById(`${prefix}ClearTagsButton`),
-    tagsContainer: document.getElementById(`${prefix}Tags`),
-    tagCount: document.getElementById(`${prefix}TagCount`),
-    quickTagButtons: document.querySelectorAll(`[data-slot-quick-tags="${prefix}"] [data-tag-template]`),
     zoomInButton: document.getElementById(`${prefix}ZoomInButton`),
     zoomOutButton: document.getElementById(`${prefix}ZoomOutButton`),
     zoomResetButton: document.getElementById(`${prefix}ZoomResetButton`),
@@ -75,7 +66,6 @@ function createSlotState(slotKey) {
     objectUrl: null,
     duration: 0,
     offsetSeconds: 0,
-    tags: [],
     zoomScale: 1,
     panX: 0,
     panY: 0,
@@ -139,11 +129,6 @@ function bindSlotEvents(slotKey) {
     offsetInput,
     timelineRange,
     inlinePlayButton,
-    tagLabelInput,
-    tagNotesInput,
-    addTagButton,
-    clearTagsButton,
-    quickTagButtons,
     zoomInButton,
     zoomOutButton,
     zoomResetButton,
@@ -303,30 +288,6 @@ function bindSlotEvents(slotKey) {
 
   dropZone.addEventListener("pointerup", releasePan);
   dropZone.addEventListener("pointercancel", releasePan);
-
-  addTagButton.addEventListener("click", () => addTag(slotKey));
-  quickTagButtons.forEach((button) => {
-    button.addEventListener("click", () => addTag(slotKey, button.dataset.tagTemplate || ""));
-  });
-  tagLabelInput.addEventListener("keydown", (event) => {
-    if (event.key === "Enter") {
-      event.preventDefault();
-      addTag(slotKey);
-    }
-  });
-  tagNotesInput.addEventListener("keydown", (event) => {
-    if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
-      event.preventDefault();
-      addTag(slotKey);
-    }
-  });
-  clearTagsButton.addEventListener("click", () => {
-    slot.tags = [];
-    persistSlotState(slotKey);
-    renderTags(slotKey);
-    state.statusMessage = `Cleared saved tags from the ${slotKey} slot.`;
-    render();
-  });
 }
 
 async function loadFileIntoSlot(slotKey, file) {
@@ -344,11 +305,9 @@ async function loadFileIntoSlot(slotKey, file) {
   slot.fileKey = createFileKey(file);
   slot.objectUrl = URL.createObjectURL(file);
   slot.duration = 0;
-  slot.tags = [];
 
   const savedState = readSlotState(slotKey, slot.fileKey);
   slot.offsetSeconds = savedState.offsetSeconds;
-  slot.tags = savedState.tags;
   slot.zoomScale = savedState.zoomScale;
   slot.panX = savedState.panX;
   slot.panY = savedState.panY;
@@ -357,7 +316,6 @@ async function loadFileIntoSlot(slotKey, file) {
   video.load();
   slot.elements.fileName.textContent = file.name;
   slot.elements.offsetInput.value = String(slot.offsetSeconds);
-  renderTags(slotKey);
   state.statusMessage = `Loading ${file.name} into the ${slotKey} slot...`;
   render();
 }
@@ -479,33 +437,6 @@ function syncVideoToTimeline(slot) {
   }
 }
 
-function addTag(slotKey, quickLabel = "") {
-  const slot = state.slots[slotKey];
-  if (!slot.fileKey) {
-    return;
-  }
-
-  const label = slot.elements.tagLabelInput.value.trim() || quickLabel.trim() || DEFAULT_TAG_LABEL;
-  const notes = slot.elements.tagNotesInput.value.trim();
-
-  const timestamp = clamp(state.timelineTime - slot.offsetSeconds, 0, slot.duration || 0);
-  const tag = {
-    id: crypto.randomUUID(),
-    timestamp,
-    label,
-    notes,
-    createdAt: new Date().toISOString(),
-  };
-
-  slot.tags = [...slot.tags, tag].sort((a, b) => a.timestamp - b.timestamp);
-  slot.elements.tagLabelInput.value = "";
-  slot.elements.tagNotesInput.value = "";
-  persistSlotState(slotKey);
-  renderTags(slotKey);
-  state.statusMessage = `Saved ${slotKey} tag "${tag.label}" at ${formatTime(tag.timestamp)}.`;
-  render();
-}
-
 function render() {
   const isSingleMode = state.mode === "single";
   elements.appShell.classList.toggle("single-mode", isSingleMode);
@@ -550,74 +481,6 @@ function render() {
 
   elements.statusBanner.textContent = buildStatusText();
 }
-
-function renderTags(slotKey) {
-  const slot = state.slots[slotKey];
-  const container = slot.elements.tagsContainer;
-  slot.elements.tagCount.textContent = String(slot.tags.length);
-
-  if (!slot.tags.length) {
-    container.className = "tag-list empty";
-    container.textContent = "No tags yet.";
-    return;
-  }
-
-  container.className = "tag-list";
-  container.replaceChildren(
-    ...slot.tags.map((tag) => {
-      const item = document.createElement("article");
-      item.className = "tag-item";
-
-      const meta = document.createElement("div");
-      meta.className = "tag-meta";
-
-      const summary = document.createElement("div");
-      summary.className = "tag-summary";
-
-      const title = document.createElement("strong");
-      title.className = "tag-title";
-      title.textContent = tag.label;
-
-      const time = document.createElement("span");
-      time.className = "tag-time";
-      time.textContent = formatTime(tag.timestamp);
-
-      summary.append(title, time);
-
-      const actions = document.createElement("div");
-      actions.className = "tag-actions";
-
-      const jump = document.createElement("button");
-      jump.className = "tag-jump";
-      jump.textContent = "Jump";
-      jump.addEventListener("click", () => {
-        pausePlayback();
-        seekTo(tag.timestamp + slot.offsetSeconds);
-      });
-
-      const note = document.createElement("div");
-      note.className = "tag-note";
-      note.textContent = tag.notes;
-      note.hidden = !tag.notes;
-
-      const remove = document.createElement("button");
-      remove.textContent = "Delete";
-      remove.addEventListener("click", () => {
-        slot.tags = slot.tags.filter((entry) => entry.id !== tag.id);
-        persistSlotState(slotKey);
-        renderTags(slotKey);
-        state.statusMessage = `Deleted tag "${tag.label}" from the ${slotKey} slot.`;
-        render();
-      });
-
-      actions.append(jump, remove);
-      meta.append(summary, actions);
-      item.append(meta, note);
-      return item;
-    })
-  );
-}
-
 function recalculateSharedDuration() {
   const durations = Object.values(state.slots)
     .filter((slot) => slot.duration > 0)
@@ -682,7 +545,6 @@ function persistSlotState(slotKey) {
     `${STORAGE_PREFIX}/${slotKey}/${slot.fileKey}`,
     JSON.stringify({
       offsetSeconds: slot.offsetSeconds,
-      tags: slot.tags,
       zoomScale: slot.zoomScale,
       panX: slot.panX,
       panY: slot.panY,
@@ -700,7 +562,6 @@ function readSlotState(slotKey, fileKey) {
     const parsed = JSON.parse(raw);
     return {
       offsetSeconds: normalizeNumber(parsed.offsetSeconds, 0),
-      tags: Array.isArray(parsed.tags) ? parsed.tags : [],
       zoomScale: normalizeZoomScale(parsed.zoomScale),
       panX: normalizeNumber(parsed.panX, 0),
       panY: normalizeNumber(parsed.panY, 0),
@@ -890,7 +751,6 @@ function clampPan(slot, panX, panY) {
 function defaultSlotPersistence() {
   return {
     offsetSeconds: 0,
-    tags: [],
     zoomScale: 1,
     panX: 0,
     panY: 0,
@@ -902,7 +762,6 @@ function handleVideoLoadError(slotKey) {
   const fileName = slot.file?.name ?? "selected file";
 
   clearSlotMedia(slot);
-  renderTags(slotKey);
   recalculateSharedDuration();
   seekTo(0);
   state.statusMessage = `Could not load ${fileName} in the ${slotKey} slot. Try another local video file.`;

@@ -13,7 +13,7 @@
           <p class="eyebrow">Mac-friendly browser prototype</p>
           <h1>Video Compare</h1>
           <p class="hero-copy">
-            Load two local videos, scrub them together, add offsets, mark tags, and loop a selected section.
+            Load two local videos, scrub them together, add offsets, and loop a selected section.
           </p>
         </div>
         <div class="hero-status" id="statusBanner">Load one or two videos to begin.</div>
@@ -94,35 +94,6 @@
                 <output id="leftCurrentTime">00:00.00</output>
               </label>
             </div>
-
-            <div class="tag-editor">
-              <h3>Add Tag</h3>
-              <p class="tag-editor-copy">Use a quick tag for common moments, or add an optional custom label.</p>
-              <div class="quick-tag-row" data-slot-quick-tags="left">
-                <button type="button" class="quick-tag-button" data-tag-template="Start">Start</button>
-                <button type="button" class="quick-tag-button" data-tag-template="Issue">Issue</button>
-                <button type="button" class="quick-tag-button" data-tag-template="Check">Check</button>
-                <button type="button" class="quick-tag-button" data-tag-template="Finish">Finish</button>
-              </div>
-              <label>
-                Custom Label (optional)
-                <input id="leftTagLabel" type="text" maxlength="80" placeholder="Sprint start" />
-              </label>
-              <label>
-                Notes (optional)
-                <textarea id="leftTagNotes" rows="3" placeholder="What stands out in this moment?"></textarea>
-              </label>
-              <p class="tag-editor-hint">Press Enter in the label field, or Cmd/Ctrl + Enter in notes, to save.</p>
-              <button id="leftAddTagButton">Save Tag At Current Time</button>
-            </div>
-
-            <div class="tag-list-block">
-              <div class="tag-list-header">
-                <h3>Tags <span id="leftTagCount" class="tag-count">0</span></h3>
-                <button id="leftClearTagsButton" class="ghost">Clear Saved Tags</button>
-              </div>
-              <div id="leftTags" class="tag-list empty">No tags yet.</div>
-            </div>
           </article>
 
           <article class="card panel" data-slot="right">
@@ -167,35 +138,6 @@
                 Current Time
                 <output id="rightCurrentTime">00:00.00</output>
               </label>
-            </div>
-
-            <div class="tag-editor">
-              <h3>Add Tag</h3>
-              <p class="tag-editor-copy">Use a quick tag for common moments, or add an optional custom label.</p>
-              <div class="quick-tag-row" data-slot-quick-tags="right">
-                <button type="button" class="quick-tag-button" data-tag-template="Start">Start</button>
-                <button type="button" class="quick-tag-button" data-tag-template="Issue">Issue</button>
-                <button type="button" class="quick-tag-button" data-tag-template="Check">Check</button>
-                <button type="button" class="quick-tag-button" data-tag-template="Finish">Finish</button>
-              </div>
-              <label>
-                Custom Label (optional)
-                <input id="rightTagLabel" type="text" maxlength="80" placeholder="Sprint start" />
-              </label>
-              <label>
-                Notes (optional)
-                <textarea id="rightTagNotes" rows="3" placeholder="What stands out in this moment?"></textarea>
-              </label>
-              <p class="tag-editor-hint">Press Enter in the label field, or Cmd/Ctrl + Enter in notes, to save.</p>
-              <button id="rightAddTagButton">Save Tag At Current Time</button>
-            </div>
-
-            <div class="tag-list-block">
-              <div class="tag-list-header">
-                <h3>Tags <span id="rightTagCount" class="tag-count">0</span></h3>
-                <button id="rightClearTagsButton" class="ghost">Clear Saved Tags</button>
-              </div>
-              <div id="rightTags" class="tag-list empty">No tags yet.</div>
             </div>
           </article>
         </section>
