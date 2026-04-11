@@ -15,6 +15,7 @@ const state = {
   animationFrameId: null,
   startedAtMs: null,
   timelineStartedAt: 0,
+  loopResumeUntilMs: 0,
   activeScrubber: null,
   activePan: null,
   openSettingsSlot: null,
@@ -47,6 +48,8 @@ const elements = {
     inlinePlayButton: document.getElementById(`${prefix}InlinePlayButton`),
     stepBackButton: document.getElementById(`${prefix}StepBackButton`),
     stepForwardButton: document.getElementById(`${prefix}StepForwardButton`),
+    captureStillButton: document.getElementById(`${prefix}CaptureStillButton`),
+    captureClipButton: document.getElementById(`${prefix}CaptureClipButton`),
     audioButton: document.getElementById(`${prefix}AudioButton`),
     zoomInButton: document.getElementById(`${prefix}ZoomInButton`),
     zoomOutButton: document.getElementById(`${prefix}ZoomOutButton`),
@@ -73,6 +76,7 @@ function createSlotState(slotKey) {
     zoomScale: 1,
     panX: 0,
     panY: 0,
+    captureBusy: false,
     elements: null,
   };
 }
@@ -127,6 +131,8 @@ function bindSlotEvents(slotKey) {
     inlinePlayButton,
     stepBackButton,
     stepForwardButton,
+    captureStillButton,
+    captureClipButton,
     audioButton,
     zoomInButton,
     zoomOutButton,
@@ -211,6 +217,12 @@ function bindSlotEvents(slotKey) {
   inlinePlayButton.addEventListener("click", togglePlayback);
   stepBackButton.addEventListener("click", () => seekBy(-SEEK_STEP_SECONDS));
   stepForwardButton.addEventListener("click", () => seekBy(SEEK_STEP_SECONDS));
+  captureStillButton.addEventListener("click", () => {
+    void captureStill(slotKey);
+  });
+  captureClipButton.addEventListener("click", () => {
+    void captureClip(slotKey);
+  });
   audioButton.addEventListener("click", () => toggleSlotAudio(slotKey));
 
   zoomInButton.addEventListener("click", () => adjustZoom(slotKey, ZOOM_STEP));
@@ -319,6 +331,7 @@ async function loadFileIntoSlot(slotKey, file) {
   slot.fileKey = createFileKey(file);
   slot.objectUrl = URL.createObjectURL(file);
   slot.duration = 0;
+  slot.captureBusy = false;
   ensureValidAudioSlot();
   syncAudio();
 
@@ -350,6 +363,7 @@ function startPlayback() {
   state.playing = true;
   state.startedAtMs = performance.now();
   state.timelineStartedAt = state.timelineTime;
+  state.loopResumeUntilMs = 0;
 
   getActiveSlots().forEach((slot) => {
     if (slot.file) {
@@ -373,6 +387,7 @@ function pausePlayback() {
     cancelAnimationFrame(state.animationFrameId);
     state.animationFrameId = null;
   }
+  state.loopResumeUntilMs = 0;
 
   Object.values(state.slots).forEach((slot) => {
     slot.elements.video.pause();
@@ -387,16 +402,23 @@ function tickPlayback() {
     return;
   }
 
+  const now = performance.now();
   const audibleSlot = getAudibleSlot();
-  const elapsedSeconds = (performance.now() - state.startedAtMs) / 1000;
-  let nextTime = audibleSlot && !audibleSlot.elements.video.paused
+  const elapsedSeconds = (now - state.startedAtMs) / 1000;
+  const shouldUseAudioClock =
+    !hasLoop() &&
+    audibleSlot &&
+    !audibleSlot.elements.video.paused &&
+    now >= state.loopResumeUntilMs;
+  let nextTime = shouldUseAudioClock
     ? getSlotTimelineTime(audibleSlot)
     : state.timelineStartedAt + elapsedSeconds * state.playbackRate;
 
   if (hasLoop() && nextTime >= state.loopEnd) {
     nextTime = state.loopStart;
-    state.startedAtMs = performance.now();
+    state.startedAtMs = now;
     state.timelineStartedAt = nextTime;
+    state.loopResumeUntilMs = now + 180;
   } else if (nextTime >= state.duration) {
     nextTime = state.duration;
     pausePlayback();
@@ -419,6 +441,7 @@ function seekTo(nextTime) {
     state.startedAtMs = performance.now();
     state.timelineStartedAt = clamped;
   }
+  state.loopResumeUntilMs = 0;
 
   syncAllVideos();
   render();
@@ -498,6 +521,9 @@ function render() {
     slot.elements.inlinePlayButton.disabled = !state.duration;
     slot.elements.stepBackButton.disabled = !state.duration;
     slot.elements.stepForwardButton.disabled = !state.duration;
+    slot.elements.captureStillButton.disabled = !slot.file || slot.captureBusy;
+    slot.elements.captureClipButton.disabled = !slot.file || slot.captureBusy;
+    slot.elements.captureClipButton.textContent = slot.captureBusy ? "Capturing..." : "Grab Clip";
     slot.elements.audioButton.disabled = !slot.file || (slot.slotKey === "right" && state.mode === "single");
     slot.elements.audioButton.classList.toggle("is-active", audibleSlotKey === slot.slotKey);
     slot.elements.audioButton.textContent = audibleSlotKey === slot.slotKey ? "🔊" : "🔇";
@@ -851,6 +877,7 @@ function clearSlotMedia(slot) {
   slot.zoomScale = 1;
   slot.panX = 0;
   slot.panY = 0;
+  slot.captureBusy = false;
 
   fileMeta.textContent = "No file selected";
   timeReadout.textContent = "00:00.00";
@@ -943,6 +970,230 @@ function defaultSlotPersistence() {
     panX: 0,
     panY: 0,
   };
+}
+
+async function captureStill(slotKey) {
+  const slot = state.slots[slotKey];
+  const { video } = slot.elements;
+  if (!slot.file || !slot.duration || video.readyState < 2) {
+    state.statusMessage = `Load a ${slotKey} video before grabbing a still.`;
+    render();
+    return;
+  }
+
+  const canvas = document.createElement("canvas");
+  canvas.width = video.videoWidth || 1280;
+  canvas.height = video.videoHeight || 720;
+  const context = canvas.getContext("2d");
+
+  if (!context) {
+    state.statusMessage = "This browser could not create a capture canvas.";
+    render();
+    return;
+  }
+
+  context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+  const blob = await canvasToBlob(canvas, "image/png");
+  if (!blob) {
+    state.statusMessage = "Still capture failed.";
+    render();
+    return;
+  }
+
+  const fileName = buildCaptureFilename(slot, "still", state.timelineTime, "png");
+  downloadBlob(blob, fileName);
+  state.statusMessage = `Saved ${slotKey} still: ${fileName}`;
+  render();
+}
+
+async function captureClip(slotKey) {
+  const slot = state.slots[slotKey];
+  if (!slot.file || !slot.duration || slot.captureBusy) {
+    return;
+  }
+
+  const clipRange = getClipRange(slot);
+  if (!clipRange) {
+    state.statusMessage = `Could not determine a clip range for the ${slotKey} video.`;
+    render();
+    return;
+  }
+
+  if (typeof MediaRecorder === "undefined") {
+    state.statusMessage = "Short clip capture is not supported in this browser.";
+    render();
+    return;
+  }
+
+  slot.captureBusy = true;
+  state.statusMessage = `Capturing ${slotKey} clip from ${formatTime(clipRange.start)} to ${formatTime(clipRange.end)}...`;
+  render();
+
+  try {
+    const clipFormat = getSupportedClipFormat();
+    if (!clipFormat) {
+      throw new Error("unsupported-recorder");
+    }
+
+    const blob = await recordSlotClip(slot, clipRange, clipFormat);
+    const fileName = buildCaptureFilename(slot, "clip", clipRange.start, clipFormat.extension);
+    downloadBlob(blob, fileName);
+    state.statusMessage = `Saved ${slotKey} clip: ${fileName}`;
+  } catch (_) {
+    state.statusMessage = `Short clip capture failed for the ${slotKey} video.`;
+  } finally {
+    slot.captureBusy = false;
+    render();
+  }
+}
+
+function getClipRange(slot) {
+  if (hasLoop()) {
+    const start = clamp(state.loopStart, 0, slot.duration);
+    const end = clamp(state.loopEnd, 0, slot.duration);
+    if (end > start) {
+      return { start, end: Math.min(end, start + 4) };
+    }
+  }
+
+  const start = clamp(state.timelineTime, 0, slot.duration);
+  const end = Math.min(slot.duration, start + 3);
+  return end > start ? { start, end } : null;
+}
+
+async function recordSlotClip(slot, clipRange, clipFormat) {
+  const captureVideo = document.createElement("video");
+  captureVideo.muted = true;
+  captureVideo.playsInline = true;
+  captureVideo.preload = "auto";
+  captureVideo.src = slot.objectUrl;
+
+  await waitForEvent(captureVideo, "loadedmetadata");
+
+  const canvas = document.createElement("canvas");
+  canvas.width = captureVideo.videoWidth || 1280;
+  canvas.height = captureVideo.videoHeight || 720;
+  const context = canvas.getContext("2d");
+  if (!context) {
+    throw new Error("missing-canvas-context");
+  }
+
+  const stream = canvas.captureStream(30);
+  const recorder = new MediaRecorder(stream, { mimeType: clipFormat.mimeType });
+  const chunks = [];
+
+  recorder.addEventListener("dataavailable", (event) => {
+    if (event.data?.size) {
+      chunks.push(event.data);
+    }
+  });
+
+  const stopped = new Promise((resolve) => {
+    recorder.addEventListener(
+      "stop",
+      () => {
+        resolve(new Blob(chunks, { type: clipFormat.mimeType }));
+      },
+      { once: true }
+    );
+  });
+
+  captureVideo.currentTime = clipRange.start;
+  await waitForEvent(captureVideo, "seeked");
+  context.drawImage(captureVideo, 0, 0, canvas.width, canvas.height);
+
+  recorder.start();
+  let rafId = null;
+
+  await new Promise((resolve, reject) => {
+    const draw = () => {
+      context.drawImage(captureVideo, 0, 0, canvas.width, canvas.height);
+
+      if (captureVideo.currentTime >= clipRange.end || captureVideo.ended) {
+        resolve();
+        return;
+      }
+
+      rafId = requestAnimationFrame(draw);
+    };
+
+    captureVideo.addEventListener("error", () => reject(new Error("capture-video-error")), { once: true });
+    rafId = requestAnimationFrame(draw);
+    void captureVideo.play().catch(reject);
+  });
+
+  if (rafId !== null) {
+    cancelAnimationFrame(rafId);
+  }
+
+  captureVideo.pause();
+  recorder.stop();
+  const blob = await stopped;
+  stream.getTracks().forEach((track) => track.stop());
+  captureVideo.removeAttribute("src");
+  captureVideo.load();
+  return blob;
+}
+
+function getSupportedClipFormat() {
+  const formats = [
+    { mimeType: "video/mp4;codecs=hvc1", extension: "mp4" },
+    { mimeType: "video/mp4;codecs=avc1.42E01E", extension: "mp4" },
+    { mimeType: "video/mp4", extension: "mp4" },
+    { mimeType: "video/webm;codecs=vp9", extension: "webm" },
+    { mimeType: "video/webm;codecs=vp8", extension: "webm" },
+    { mimeType: "video/webm", extension: "webm" },
+  ];
+
+  return formats.find((format) => MediaRecorder.isTypeSupported(format.mimeType)) ?? null;
+}
+
+function canvasToBlob(canvas, mimeType) {
+  return new Promise((resolve) => {
+    canvas.toBlob(resolve, mimeType);
+  });
+}
+
+function waitForEvent(target, eventName) {
+  return new Promise((resolve, reject) => {
+    const onSuccess = () => {
+      cleanup();
+      resolve();
+    };
+    const onError = () => {
+      cleanup();
+      reject(new Error(`${eventName}-failed`));
+    };
+    const cleanup = () => {
+      target.removeEventListener(eventName, onSuccess);
+      target.removeEventListener("error", onError);
+    };
+
+    target.addEventListener(eventName, onSuccess, { once: true });
+    target.addEventListener("error", onError, { once: true });
+  });
+}
+
+function downloadBlob(blob, fileName) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  document.body.append(link);
+  link.click();
+  link.remove();
+
+  setTimeout(() => {
+    URL.revokeObjectURL(url);
+  }, 1000);
+}
+
+function buildCaptureFilename(slot, kind, timeSeconds, extension) {
+  const baseName = (slot.file?.name || `${slot.slotKey}-video`).replace(/\.[^./]+$/, "");
+  const safeBaseName = baseName.replace(/[^a-z0-9-_]+/gi, "-").replace(/^-+|-+$/g, "") || slot.slotKey;
+  const timestamp = formatTime(timeSeconds).replace(/[:.]/g, "-");
+  return `${safeBaseName}-${kind}-${timestamp}.${extension}`;
 }
 
 function handleVideoLoadError(slotKey) {

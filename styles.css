@@ -624,7 +624,7 @@ video {
 
 .video-toolbar {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  grid-template-columns: minmax(0, 1fr) auto auto auto auto;
   align-items: center;
   gap: 14px;
   padding: 12px 14px 0;
@@ -723,6 +723,20 @@ video {
 }
 
 .loop-button {
+  min-width: 112px;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(174, 198, 255, 0.14);
+}
+
+.capture-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  justify-self: end;
+}
+
+.capture-button {
   min-width: 112px;
   color: var(--muted);
   background: rgba(255, 255, 255, 0.03);
@@ -841,7 +855,8 @@ textarea {
   }
 
   .playback-controls,
-  .loop-controls {
+  .loop-controls,
+  .capture-controls {
     justify-self: start;
     flex-wrap: wrap;
   }
@@ -868,7 +883,8 @@ textarea {
   }
 
   .playback-controls,
-  .loop-controls {
+  .loop-controls,
+  .capture-controls {
     width: 100%;
     justify-content: flex-start;
   }
