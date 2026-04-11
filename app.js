@@ -500,7 +500,7 @@ function render() {
     slot.elements.stepForwardButton.disabled = !state.duration;
     slot.elements.audioButton.disabled = !slot.file || (slot.slotKey === "right" && state.mode === "single");
     slot.elements.audioButton.classList.toggle("is-active", audibleSlotKey === slot.slotKey);
-    slot.elements.audioButton.textContent = audibleSlotKey === slot.slotKey ? "Sound On" : "Sound Off";
+    slot.elements.audioButton.textContent = audibleSlotKey === slot.slotKey ? "🔊" : "🔇";
     slot.elements.audioButton.setAttribute(
       "aria-label",
       audibleSlotKey === slot.slotKey ? `Disable sound for the ${slot.slotKey} video` : `Enable sound for the ${slot.slotKey} video`
