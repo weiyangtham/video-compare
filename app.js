@@ -1,4 +1,7 @@
 const STORAGE_PREFIX = "video-compare/v1";
+const SEEK_STEP_SECONDS = 0.1;
+const SEEK_LARGE_STEP_SECONDS = 1;
+
 const state = {
   mode: "single",
   timelineTime: 0,
@@ -202,8 +205,8 @@ function bindSlotEvents(slotKey) {
   });
   bindScrubberGesture(timelineRange, slotKey);
   inlinePlayButton.addEventListener("click", togglePlayback);
-  stepBackButton.addEventListener("click", () => seekTo(state.timelineTime - 1));
-  stepForwardButton.addEventListener("click", () => seekTo(state.timelineTime + 1));
+  stepBackButton.addEventListener("click", () => seekBy(-SEEK_STEP_SECONDS));
+  stepForwardButton.addEventListener("click", () => seekBy(SEEK_STEP_SECONDS));
 
   zoomInButton.addEventListener("click", () => adjustZoom(slotKey, ZOOM_STEP));
   zoomOutButton.addEventListener("click", () => adjustZoom(slotKey, -ZOOM_STEP));
@@ -580,7 +583,27 @@ function handleDocumentClick(event) {
 function handleDocumentKeydown(event) {
   if (event.key === "Escape") {
     closeSettingsMenu();
+    return;
   }
+
+  if (
+    event.target instanceof HTMLElement &&
+    (event.target.isContentEditable ||
+      ["INPUT", "TEXTAREA", "SELECT", "BUTTON"].includes(event.target.tagName))
+  ) {
+    return;
+  }
+
+  if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+    event.preventDefault();
+    const step = event.shiftKey ? SEEK_LARGE_STEP_SECONDS : SEEK_STEP_SECONDS;
+    const direction = event.key === "ArrowLeft" ? -1 : 1;
+    seekBy(step * direction);
+  }
+}
+
+function seekBy(deltaSeconds) {
+  seekTo(state.timelineTime + deltaSeconds);
 }
 
 function persistSlotState(slotKey) {
