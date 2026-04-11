@@ -456,7 +456,10 @@ function render() {
   const isCompareMode = state.mode === "compare";
   elements.appShell.classList.toggle("single-mode", isSingleMode);
   elements.appShell.classList.toggle("compare-mode", isCompareMode);
-  elements.modeToggleButton.textContent = isCompareMode ? "Disable Compare" : "Enable Compare";
+  elements.modeToggleButton.textContent = isCompareMode ? "Back to Solo" : "Enable Compare";
+  elements.modeToggleButton.setAttribute("aria-pressed", String(isCompareMode));
+  elements.modeToggleButton.classList.toggle("primary", isCompareMode);
+  elements.modeToggleButton.classList.toggle("ghost", !isCompareMode);
   elements.leftPanelTitle.textContent = isCompareMode ? "Primary Video" : "Video";
   elements.rightPanelTitle.textContent = "Compare Video";
   if (elements.playPauseButton) {

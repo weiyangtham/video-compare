@@ -37,15 +37,19 @@ textarea {
 .app-shell {
   max-width: 1480px;
   margin: 0 auto;
-  padding: 32px 20px 56px;
+  padding: 28px 24px 56px;
 }
 
 .hero {
   display: flex;
   justify-content: space-between;
   gap: 24px;
-  align-items: end;
-  margin-bottom: 24px;
+  align-items: start;
+  margin-bottom: 18px;
+}
+
+.hero-copy-block {
+  max-width: 760px;
 }
 
 .eyebrow {
@@ -70,23 +74,37 @@ h1 {
 }
 
 .hero-copy {
-  max-width: 64ch;
+  max-width: 60ch;
   color: var(--muted);
+  margin-bottom: 0;
+}
+
+.hero-actions {
+  display: grid;
+  justify-items: end;
+  gap: 12px;
+  min-width: 260px;
+}
+
+.hero-compare-button {
+  padding-inline: 16px;
+  color: var(--muted);
+  border-color: rgba(174, 198, 255, 0.14);
+  background: rgba(255, 255, 255, 0.03);
 }
 
 .hero-status {
   min-width: 240px;
   padding: 14px 16px;
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.04);
   border: 1px solid var(--line);
-  box-shadow: var(--shadow);
   color: var(--muted);
 }
 
 .layout {
   display: grid;
-  gap: 20px;
+  gap: 18px;
 }
 
 .card {
@@ -98,36 +116,35 @@ h1 {
 }
 
 .transport {
-  padding: 18px;
-  display: grid;
-  gap: 18px;
+  width: min(100%, 1320px);
+  margin-inline: auto;
+  padding: 16px 18px;
 }
 
 .transport-row {
   display: grid;
-  grid-template-columns: minmax(140px, 180px) minmax(0, 1fr) minmax(220px, 260px);
+  grid-template-columns: minmax(0, 1fr);
   gap: 16px;
-  align-items: start;
+  align-items: stretch;
 }
 
 .transport-group {
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(255, 255, 255, 0.025);
   border: 1px solid rgba(174, 198, 255, 0.12);
   border-radius: 18px;
-}
-
-.transport-group {
   display: grid;
-  gap: 12px;
-  padding: 14px;
+  gap: 10px;
+  padding: 14px 16px;
 }
 
 .transport-group-speed {
   align-content: start;
+  justify-self: start;
+  min-width: 180px;
 }
 
 .transport-group-loop {
-  gap: 14px;
+  gap: 12px;
 }
 
 .transport-label {
@@ -142,34 +159,30 @@ h1 {
   display: flex;
   justify-content: space-between;
   gap: 16px;
-  align-items: start;
+  align-items: center;
 }
 
 .transport-group-copy {
-  margin: 8px 0 0;
+  margin: 6px 0 0;
   color: var(--muted);
-  max-width: 48ch;
+  max-width: 56ch;
   line-height: 1.4;
 }
 
 .loop-panel-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 10px;
 }
 
 .loop-readout {
   align-self: center;
-  padding: 10px 12px;
+  padding: 9px 12px;
   border-radius: 12px;
   background: rgba(7, 11, 17, 0.42);
   border: 1px solid rgba(174, 198, 255, 0.12);
   color: var(--text);
   white-space: nowrap;
-}
-
-.transport-group-view {
-  align-content: start;
 }
 
 .speed-control {
@@ -248,26 +261,22 @@ input[type="range"] {
 }
 
 .app-shell {
-  --left-panel-max-width: 1240px;
-  --left-inner-max-width: 1040px;
-  --left-control-columns: minmax(220px, 280px);
+  --left-panel-max-width: 1360px;
+  --left-inner-max-width: 1240px;
 }
 
 [data-slot="left"] {
-  max-width: 1240px;
-  margin-inline: auto;
-  padding: 24px;
-  gap: 16px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02)),
-    rgba(16, 21, 31, 0.9);
   max-width: var(--left-panel-max-width);
+  margin-inline: auto;
+  padding: 18px 18px 20px;
+  gap: 14px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.018)),
+    rgba(16, 21, 31, 0.9);
 }
 
 [data-slot="left"] .panel-header,
-[data-slot="left"] .video-toolbar,
-[data-slot="left"] .control-grid {
-  width: min(100%, 1040px);
+[data-slot="left"] .video-toolbar {
   margin-inline: auto;
   width: min(100%, var(--left-inner-max-width));
 }
@@ -277,15 +286,10 @@ input[type="range"] {
 }
 
 [data-slot="left"] .video-frame {
-  width: min(100%, calc(min(68vh, 880px) * 16 / 9));
+  width: min(100%, calc(min(74vh, 980px) * 16 / 9));
   margin-inline: auto;
   border-radius: 24px;
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.32);
-}
-
-[data-slot="left"] .control-grid {
-  grid-template-columns: var(--left-control-columns);
-  justify-content: center;
+  box-shadow: 0 26px 64px rgba(0, 0, 0, 0.34);
 }
 
 .app-shell.compare-mode .video-grid {
@@ -307,7 +311,6 @@ input[type="range"] {
 .app-shell.compare-mode {
   --left-panel-max-width: none;
   --left-inner-max-width: none;
-  --left-control-columns: repeat(2, minmax(0, 1fr));
 }
 
 .app-shell.compare-mode [data-slot="left"] {
@@ -324,7 +327,7 @@ input[type="range"] {
 .panel {
   padding: 18px;
   display: grid;
-  gap: 18px;
+  gap: 14px;
 }
 
 .panel-header {
@@ -332,6 +335,12 @@ input[type="range"] {
   justify-content: space-between;
   gap: 16px;
   align-items: center;
+}
+
+.panel-header h2 {
+  margin-bottom: 0;
+  font-size: clamp(1.7rem, 2.4vw, 2.45rem);
+  line-height: 1;
 }
 
 .file-picker input {
@@ -342,7 +351,7 @@ input[type="range"] {
   position: relative;
   aspect-ratio: 16 / 9;
   overflow: hidden;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(0, 0, 0, 0.34));
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(0, 0, 0, 0.36));
   border-radius: 18px;
   border: 1px solid var(--line);
   transition: border-color 120ms ease, box-shadow 120ms ease, transform 120ms ease;
@@ -493,6 +502,7 @@ video {
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 12px;
+  padding: 10px 14px 0;
 }
 
 .toolbar-button {
@@ -599,12 +609,6 @@ video {
   cursor: grabbing;
 }
 
-.control-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
-}
-
 input[type="number"],
 select,
 input[type="text"],
@@ -630,23 +634,21 @@ textarea {
     flex-direction: column;
   }
 
-  .video-grid,
-  .control-grid {
-    grid-template-columns: 1fr;
+  .hero-actions {
+    justify-items: stretch;
+    min-width: 0;
   }
 
   .transport-row {
     grid-template-columns: 1fr;
   }
 
-  .transport-group-view,
   .transport-group-speed,
   .transport-group-loop {
     width: 100%;
   }
 
-  .video-toolbar,
-  [data-slot="left"] .control-grid {
+  .video-toolbar {
     grid-template-columns: 1fr;
   }
 
@@ -664,13 +666,11 @@ textarea {
     padding: 12px;
   }
 
-  .transport-group-view button,
   .loop-panel-actions button {
     width: 100%;
   }
 
-  .loop-panel-actions,
-  .transport-group-view {
+  .loop-panel-actions {
     display: grid;
     grid-template-columns: 1fr;
     align-items: stretch;

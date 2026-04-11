@@ -9,54 +9,20 @@
   <body>
     <div class="app-shell" id="appShell">
       <header class="hero">
-        <div>
+        <div class="hero-copy-block">
           <p class="eyebrow">Mac-friendly browser prototype</p>
           <h1>Video Compare</h1>
           <p class="hero-copy">
             Load a local video, scrub precisely, adjust playback, and turn on compare mode only when you need it.
           </p>
         </div>
-        <div class="hero-status" id="statusBanner">Load a video to begin.</div>
+        <div class="hero-actions">
+          <button id="modeToggleButton" class="ghost hero-compare-button" type="button">Enable Compare</button>
+          <div class="hero-status" id="statusBanner">Load a video to begin.</div>
+        </div>
       </header>
 
       <main class="layout">
-        <section class="transport card">
-          <div class="transport-row">
-            <div class="transport-group transport-group-speed compare-only" aria-label="Playback speed controls">
-              <label class="speed-control" for="playbackRateSelect">
-                <span class="transport-label">Speed</span>
-                <select id="playbackRateSelect">
-                  <option value="0.25">0.25x</option>
-                  <option value="0.5">0.5x</option>
-                  <option value="0.75">0.75x</option>
-                  <option value="1" selected>1x</option>
-                </select>
-              </label>
-            </div>
-
-            <div class="transport-group transport-group-loop" aria-label="Loop controls">
-              <div class="transport-group-header">
-                <div>
-                  <p class="transport-label">Loop Tools</p>
-                  <p class="transport-group-copy">Drop A and B markers, then clear when you want to reset the selection.</p>
-                </div>
-                <span id="loopReadout" class="loop-readout">Loop: Off</span>
-              </div>
-              <div class="loop-panel-actions">
-                <button id="setLoopStartButton">Set A</button>
-                <button id="setLoopEndButton">Set B</button>
-                <button id="clearLoopButton">Clear Loop</button>
-              </div>
-            </div>
-
-            <div class="transport-group transport-group-view" aria-label="View mode controls">
-              <span class="transport-label">View</span>
-              <button id="modeToggleButton" class="ghost">Enable Compare</button>
-            </div>
-          </div>
-
-        </section>
-
         <section class="video-grid">
           <article class="card panel" data-slot="left">
             <div class="panel-header">
@@ -175,6 +141,37 @@
             </div>
 
           </article>
+        </section>
+
+        <section class="transport card" aria-label="Analysis controls">
+          <div class="transport-row">
+            <div class="transport-group transport-group-loop" aria-label="Loop controls">
+              <div class="transport-group-header">
+                <div>
+                  <p class="transport-label">Phrase Loop</p>
+                  <p class="transport-group-copy">Mark a phrase, then replay it to inspect timing, lines, and transitions.</p>
+                </div>
+                <span id="loopReadout" class="loop-readout">Loop: Off</span>
+              </div>
+              <div class="loop-panel-actions">
+                <button id="setLoopStartButton">Set A</button>
+                <button id="setLoopEndButton">Set B</button>
+                <button id="clearLoopButton">Clear</button>
+              </div>
+            </div>
+
+            <div class="transport-group transport-group-speed compare-only" aria-label="Playback speed controls">
+              <label class="speed-control" for="playbackRateSelect">
+                <span class="transport-label">Compare Speed</span>
+                <select id="playbackRateSelect">
+                  <option value="0.25">0.25x</option>
+                  <option value="0.5">0.5x</option>
+                  <option value="0.75">0.75x</option>
+                  <option value="1" selected>1x</option>
+                </select>
+              </label>
+            </div>
+          </div>
         </section>
       </main>
     </div>
