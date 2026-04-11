@@ -59,6 +59,17 @@
               </div>
             </div>
 
+            <div class="panel-loop-bar" aria-label="Loop controls">
+              <div class="panel-loop-summary">
+                <p class="transport-label">Loop Section</p>
+              </div>
+              <div class="panel-loop-actions">
+                <button type="button" data-loop-action="start">Set Start</button>
+                <button type="button" data-loop-action="end">Set End</button>
+                <button type="button" data-loop-action="clear">Clear</button>
+              </div>
+            </div>
+
             <div class="video-toolbar" aria-label="Left video controls">
               <button id="leftInlinePlayButton" type="button" class="toolbar-button toolbar-play-button" aria-label="Play synced videos"></button>
               <div class="zoom-controls" aria-label="Left video zoom controls">
@@ -127,6 +138,17 @@
               </div>
             </div>
 
+            <div class="panel-loop-bar" aria-label="Loop controls">
+              <div class="panel-loop-summary">
+                <p class="transport-label">Loop Section</p>
+              </div>
+              <div class="panel-loop-actions">
+                <button type="button" data-loop-action="start">Set Start</button>
+                <button type="button" data-loop-action="end">Set End</button>
+                <button type="button" data-loop-action="clear">Clear</button>
+              </div>
+            </div>
+
             <div class="video-toolbar" aria-label="Right video controls">
               <button id="rightInlinePlayButton" type="button" class="toolbar-button toolbar-play-button" aria-label="Play synced videos"></button>
               <div class="zoom-controls" aria-label="Right video zoom controls">
@@ -163,21 +185,6 @@
 
         <section class="transport card" aria-label="Analysis controls">
           <div class="transport-row">
-            <div class="transport-group transport-group-loop" aria-label="Loop controls">
-              <div class="transport-group-header">
-                <div>
-                  <p class="transport-label">Loop Section</p>
-                  <p class="transport-group-copy">Set a start point, set an end point, then play. The selected region is highlighted on each timeline.</p>
-                </div>
-                <span id="loopReadout" class="loop-readout">Loop off</span>
-              </div>
-              <div class="loop-panel-actions">
-                <button id="setLoopStartButton">Set Start</button>
-                <button id="setLoopEndButton">Set End</button>
-                <button id="clearLoopButton">Clear</button>
-              </div>
-            </div>
-
             <div class="transport-group transport-group-speed compare-only" aria-label="Playback speed controls">
               <label class="speed-control" for="playbackRateSelect">
                 <span class="transport-label">Compare Speed</span>

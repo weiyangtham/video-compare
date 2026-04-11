@@ -27,11 +27,8 @@ const elements = {
   stepBackButton: document.getElementById("stepBackButton"),
   stepForwardButton: document.getElementById("stepForwardButton"),
   playbackRateSelect: document.getElementById("playbackRateSelect"),
-  setLoopStartButton: document.getElementById("setLoopStartButton"),
-  setLoopEndButton: document.getElementById("setLoopEndButton"),
-  clearLoopButton: document.getElementById("clearLoopButton"),
+  loopActionButtons: Array.from(document.querySelectorAll("[data-loop-action]")),
   modeToggleButton: document.getElementById("modeToggleButton"),
-  loopReadout: document.getElementById("loopReadout"),
   leftPanelTitle: document.getElementById("leftPanelTitle"),
   rightPanelTitle: document.getElementById("rightPanelTitle"),
 };
@@ -92,27 +89,26 @@ function bindGlobalEvents() {
   elements.playbackRateSelect.addEventListener("change", (event) => {
     setPlaybackRate(Number(event.target.value));
   });
-  elements.setLoopStartButton.addEventListener("click", () => {
-    state.loopStart = state.timelineTime;
-    if (state.loopEnd !== null && state.loopEnd < state.loopStart) {
-      state.loopEnd = null;
-    }
-    persistTransportState();
-    render();
-  });
-  elements.setLoopEndButton.addEventListener("click", () => {
-    state.loopEnd = state.timelineTime;
-    if (state.loopStart !== null && state.loopEnd < state.loopStart) {
-      state.loopStart = state.loopEnd;
-    }
-    persistTransportState();
-    render();
-  });
-  elements.clearLoopButton.addEventListener("click", () => {
-    state.loopStart = null;
-    state.loopEnd = null;
-    persistTransportState();
-    render();
+  elements.loopActionButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+      const action = button.dataset.loopAction;
+      if (action === "start") {
+        state.loopStart = state.timelineTime;
+        if (state.loopEnd !== null && state.loopEnd < state.loopStart) {
+          state.loopEnd = null;
+        }
+      } else if (action === "end") {
+        state.loopEnd = state.timelineTime;
+        if (state.loopStart !== null && state.loopEnd < state.loopStart) {
+          state.loopStart = state.loopEnd;
+        }
+      } else if (action === "clear") {
+        state.loopStart = null;
+        state.loopEnd = null;
+      }
+      persistTransportState();
+      render();
+    });
   });
   elements.modeToggleButton.addEventListener("click", toggleMode);
   document.addEventListener("click", handleDocumentClick);
@@ -467,7 +463,6 @@ function render() {
     elements.playPauseButton.textContent = state.playing ? "Pause" : "Play";
   }
   elements.playbackRateSelect.value = String(state.playbackRate);
-  elements.loopReadout.textContent = getLoopReadoutText();
 
   Object.values(state.slots).forEach((slot) => {
     const slotTime = clamp(state.timelineTime, 0, slot.duration || 0);
@@ -863,22 +858,6 @@ function capitalize(value) {
 
 function hasLoop() {
   return state.loopStart !== null && state.loopEnd !== null && state.loopEnd > state.loopStart;
-}
-
-function getLoopReadoutText() {
-  if (hasLoop()) {
-    return `Looping ${formatTime(state.loopStart)} to ${formatTime(state.loopEnd)}`;
-  }
-
-  if (state.loopStart !== null) {
-    return `Start set at ${formatTime(state.loopStart)}`;
-  }
-
-  if (state.loopEnd !== null) {
-    return `End set at ${formatTime(state.loopEnd)}`;
-  }
-
-  return "Loop off";
 }
 
 function applyLoopTrackVisual(slot) {
