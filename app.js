@@ -43,7 +43,7 @@ const elements = {
     video: document.getElementById(`${prefix}Video`),
     videoStage: document.getElementById(`${prefix}VideoStage`),
     dropZone: document.querySelector(`[data-drop-zone="${prefix}"]`),
-    fileName: document.getElementById(`${prefix}FileName`),
+    fileMeta: document.getElementById(`${prefix}FileMeta`),
     timeReadout: document.getElementById(`${prefix}TimeReadout`),
     timelineRange: document.getElementById(`${prefix}TimelineRange`),
     inlinePlayButton: document.getElementById(`${prefix}InlinePlayButton`),
@@ -154,7 +154,7 @@ function bindSlotEvents(slotKey) {
   });
 
   video.addEventListener("loadeddata", () => {
-    state.statusMessage = `${capitalize(slotKey)} video ready: ${slot.file?.name ?? "local file loaded"}.`;
+    state.statusMessage = "";
     render();
   });
 
@@ -323,7 +323,7 @@ async function loadFileIntoSlot(slotKey, file) {
 
   video.src = slot.objectUrl;
   video.load();
-  slot.elements.fileName.textContent = file.name;
+  slot.elements.fileMeta.textContent = file.name;
   state.statusMessage = `Loading ${file.name} into the ${slotKey} slot...`;
   render();
 }
@@ -503,7 +503,9 @@ function render() {
     }
   });
 
-  elements.statusBanner.textContent = buildStatusText();
+  const statusText = buildStatusText();
+  elements.statusBanner.textContent = statusText;
+  elements.statusBanner.hidden = !statusText;
 }
 function recalculateSharedDuration() {
   const durations = getActiveSlots()
@@ -716,11 +718,15 @@ function buildStatusText() {
     return "Primary video loaded. Add a compare video when you're ready.";
   }
 
-  return `${loadedCount} video${loadedCount === 1 ? "" : "s"} loaded. Timeline duration ${formatTime(state.duration)}.`;
+  if (state.mode === "single") {
+    return "";
+  }
+
+  return `${loadedCount} videos loaded. Timeline duration ${formatTime(state.duration)}.`;
 }
 
 function clearSlotMedia(slot) {
-  const { video, fileName, timeReadout } = slot.elements;
+  const { video, fileMeta, timeReadout } = slot.elements;
 
   if (slot.objectUrl) {
     URL.revokeObjectURL(slot.objectUrl);
@@ -737,7 +743,7 @@ function clearSlotMedia(slot) {
   slot.panX = 0;
   slot.panY = 0;
 
-  fileName.textContent = "No file selected";
+  fileMeta.textContent = "No file selected";
   timeReadout.textContent = "00:00.00";
 }
 

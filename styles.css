@@ -338,10 +338,25 @@ input[type="range"] {
   align-items: center;
 }
 
+.panel-title-block {
+  min-width: 0;
+}
+
 .panel-header h2 {
   margin-bottom: 0;
   font-size: clamp(1.7rem, 2.4vw, 2.45rem);
   line-height: 1;
+}
+
+.panel-file-meta {
+  margin: 5px 0 0;
+  color: rgba(153, 167, 194, 0.86);
+  font-size: 0.82rem;
+  max-width: min(40ch, 100%);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .file-picker input {
@@ -408,13 +423,15 @@ video {
 
 .video-overlay {
   position: absolute;
-  inset: auto 12px 44px;
+  right: 12px;
+  bottom: 44px;
   padding: 8px 10px;
   border-radius: 12px;
   background: rgba(5, 8, 14, 0.76);
   color: var(--muted);
   font-size: 0.92rem;
   z-index: 2;
+  font-variant-numeric: tabular-nums;
 }
 
 .video-scrubber {

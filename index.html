@@ -26,7 +26,10 @@
         <section class="video-grid">
           <article class="card panel" data-slot="left">
             <div class="panel-header">
-              <h2 id="leftPanelTitle">Left Video</h2>
+              <div class="panel-title-block">
+                <h2 id="leftPanelTitle">Left Video</h2>
+                <p id="leftFileMeta" class="panel-file-meta">No file selected</p>
+              </div>
               <label class="file-picker">
                 <span>Select Video</span>
                 <input id="leftFileInput" type="file" accept="video/*" />
@@ -39,7 +42,6 @@
               </div>
               <div class="drop-hint" aria-hidden="true">Drop a video here</div>
               <div class="video-overlay">
-                <span id="leftFileName">No file selected</span>
                 <span id="leftTimeReadout">00:00.00</span>
               </div>
               <div class="video-scrubber">
@@ -92,7 +94,10 @@
 
           <article class="card panel" data-slot="right">
             <div class="panel-header">
-              <h2 id="rightPanelTitle">Compare Video</h2>
+              <div class="panel-title-block">
+                <h2 id="rightPanelTitle">Compare Video</h2>
+                <p id="rightFileMeta" class="panel-file-meta">No file selected</p>
+              </div>
               <label class="file-picker">
                 <span>Select Compare Video</span>
                 <input id="rightFileInput" type="file" accept="video/*" />
@@ -105,7 +110,6 @@
               </div>
               <div class="drop-hint" aria-hidden="true">Drop a video here</div>
               <div class="video-overlay">
-                <span id="rightFileName">No file selected</span>
                 <span id="rightTimeReadout">00:00.00</span>
               </div>
               <div class="video-scrubber">
