@@ -729,6 +729,20 @@ video {
   border-color: rgba(174, 198, 255, 0.14);
 }
 
+.audio-button {
+  min-width: 108px;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(174, 198, 255, 0.14);
+  justify-self: end;
+}
+
+.audio-button.is-active {
+  color: var(--text);
+  background: linear-gradient(135deg, rgba(109, 211, 199, 0.22), rgba(122, 167, 255, 0.2));
+  border-color: rgba(109, 211, 199, 0.4);
+}
+
 .video-settings {
   position: relative;
   justify-self: end;
@@ -832,6 +846,7 @@ textarea {
     flex-wrap: wrap;
   }
 
+  .audio-button,
   .video-settings {
     justify-self: start;
   }

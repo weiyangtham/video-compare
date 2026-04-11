@@ -7,6 +7,7 @@ const state = {
   timelineTime: 0,
   playing: false,
   playbackRate: 1,
+  audioSlotKey: "left",
   duration: 0,
   loopStart: null,
   loopEnd: null,
@@ -46,6 +47,7 @@ const elements = {
     inlinePlayButton: document.getElementById(`${prefix}InlinePlayButton`),
     stepBackButton: document.getElementById(`${prefix}StepBackButton`),
     stepForwardButton: document.getElementById(`${prefix}StepForwardButton`),
+    audioButton: document.getElementById(`${prefix}AudioButton`),
     zoomInButton: document.getElementById(`${prefix}ZoomInButton`),
     zoomOutButton: document.getElementById(`${prefix}ZoomOutButton`),
     zoomResetButton: document.getElementById(`${prefix}ZoomResetButton`),
@@ -81,6 +83,7 @@ function init() {
   bindGlobalEvents();
   bindSlotEvents("left");
   bindSlotEvents("right");
+  syncAudio();
   render();
 }
 
@@ -124,6 +127,7 @@ function bindSlotEvents(slotKey) {
     inlinePlayButton,
     stepBackButton,
     stepForwardButton,
+    audioButton,
     zoomInButton,
     zoomOutButton,
     zoomResetButton,
@@ -207,6 +211,7 @@ function bindSlotEvents(slotKey) {
   inlinePlayButton.addEventListener("click", togglePlayback);
   stepBackButton.addEventListener("click", () => seekBy(-SEEK_STEP_SECONDS));
   stepForwardButton.addEventListener("click", () => seekBy(SEEK_STEP_SECONDS));
+  audioButton.addEventListener("click", () => toggleSlotAudio(slotKey));
 
   zoomInButton.addEventListener("click", () => adjustZoom(slotKey, ZOOM_STEP));
   zoomOutButton.addEventListener("click", () => adjustZoom(slotKey, -ZOOM_STEP));
@@ -314,6 +319,8 @@ async function loadFileIntoSlot(slotKey, file) {
   slot.fileKey = createFileKey(file);
   slot.objectUrl = URL.createObjectURL(file);
   slot.duration = 0;
+  ensureValidAudioSlot();
+  syncAudio();
 
   const savedState = readSlotState(slotKey, slot.fileKey);
   slot.zoomScale = savedState.zoomScale;
@@ -356,6 +363,7 @@ function startPlayback() {
   });
 
   state.animationFrameId = requestAnimationFrame(tickPlayback);
+  syncAudio();
   render();
 }
 
@@ -370,6 +378,7 @@ function pausePlayback() {
     slot.elements.video.pause();
   });
 
+  syncAudio();
   render();
 }
 
@@ -378,8 +387,11 @@ function tickPlayback() {
     return;
   }
 
+  const audibleSlot = getAudibleSlot();
   const elapsedSeconds = (performance.now() - state.startedAtMs) / 1000;
-  let nextTime = state.timelineStartedAt + elapsedSeconds * state.playbackRate;
+  let nextTime = audibleSlot && !audibleSlot.elements.video.paused
+    ? getSlotTimelineTime(audibleSlot)
+    : state.timelineStartedAt + elapsedSeconds * state.playbackRate;
 
   if (hasLoop() && nextTime >= state.loopEnd) {
     nextTime = state.loopStart;
@@ -417,6 +429,7 @@ function syncAllVideos() {
   getInactiveSlots().forEach((slot) => {
     slot.elements.video.pause();
   });
+  syncAudio();
 }
 
 function syncVideoToTimeline(slot) {
@@ -430,8 +443,10 @@ function syncVideoToTimeline(slot) {
   const targetTime = getSlotTargetTime(slot, state.timelineTime);
   const drift = Math.abs(video.currentTime - targetTime);
   const isActiveAtCurrentTimelineTime = isSlotActiveAtTimelineTime(slot, state.timelineTime);
+  const isAudioMaster = isAudioMasterSlot(slot);
+  const allowedDrift = isAudioMaster && state.playing ? 0.35 : 0.08;
 
-  if (drift > 0.08 || !state.playing) {
+  if (drift > allowedDrift || !state.playing) {
     try {
       video.currentTime = targetTime;
     } catch (_) {
@@ -454,6 +469,7 @@ function syncVideoToTimeline(slot) {
 function render() {
   const isSingleMode = state.mode === "single";
   const isCompareMode = state.mode === "compare";
+  const audibleSlotKey = getAudibleSlotKey();
   elements.appShell.classList.toggle("single-mode", isSingleMode);
   elements.appShell.classList.toggle("compare-mode", isCompareMode);
   elements.modeToggleButton.textContent = isCompareMode ? "Back to Solo" : "Enable Compare";
@@ -482,6 +498,14 @@ function render() {
     slot.elements.inlinePlayButton.disabled = !state.duration;
     slot.elements.stepBackButton.disabled = !state.duration;
     slot.elements.stepForwardButton.disabled = !state.duration;
+    slot.elements.audioButton.disabled = !slot.file || (slot.slotKey === "right" && state.mode === "single");
+    slot.elements.audioButton.classList.toggle("is-active", audibleSlotKey === slot.slotKey);
+    slot.elements.audioButton.textContent = audibleSlotKey === slot.slotKey ? "Sound On" : "Sound Off";
+    slot.elements.audioButton.setAttribute(
+      "aria-label",
+      audibleSlotKey === slot.slotKey ? `Disable sound for the ${slot.slotKey} video` : `Enable sound for the ${slot.slotKey} video`
+    );
+    slot.elements.audioButton.setAttribute("aria-pressed", String(audibleSlotKey === slot.slotKey));
     slot.elements.settingsButton.disabled = !state.duration;
     slot.elements.settingsButton.setAttribute("aria-expanded", String(state.openSettingsSlot === slot.slotKey));
     slot.elements.settingsMenu.hidden = state.openSettingsSlot !== slot.slotKey;
@@ -521,6 +545,7 @@ function persistTransportState() {
       loopStart: state.loopStart,
       loopEnd: state.loopEnd,
       playbackRate: state.playbackRate,
+      audioSlotKey: state.audioSlotKey,
     })
   );
 }
@@ -545,10 +570,12 @@ function loadTransportState() {
     state.loopStart = parsed.loopStart ?? null;
     state.loopEnd = parsed.loopEnd ?? null;
     state.playbackRate = normalizePlaybackRate(parsed.playbackRate);
+    state.audioSlotKey = normalizeAudioSlotKey(parsed.audioSlotKey);
   } catch (_) {
     state.loopStart = null;
     state.loopEnd = null;
     state.playbackRate = 1;
+    state.audioSlotKey = "left";
   }
 }
 
@@ -556,8 +583,10 @@ function toggleMode() {
   state.mode = state.mode === "single" ? "compare" : "single";
   closeSettingsMenu();
   recalculateSharedDuration();
+  ensureValidAudioSlot();
   seekTo(state.timelineTime);
   persistModeState();
+  persistTransportState();
   render();
 }
 
@@ -700,8 +729,71 @@ function setPlaybackRate(nextRate) {
   render();
 }
 
+function toggleSlotAudio(slotKey) {
+  const slot = state.slots[slotKey];
+  if (!slot.file || (slotKey === "right" && state.mode === "single")) {
+    return;
+  }
+
+  state.audioSlotKey = state.audioSlotKey === slotKey ? null : slotKey;
+  ensureValidAudioSlot();
+  syncAudio();
+  persistTransportState();
+  render();
+}
+
+function syncAudio() {
+  const audibleSlotKey = getAudibleSlotKey();
+  Object.values(state.slots).forEach((slot) => {
+    const shouldBeAudible = slot.slotKey === audibleSlotKey;
+    slot.elements.video.muted = !shouldBeAudible;
+    slot.elements.video.volume = shouldBeAudible ? 1 : 0;
+  });
+}
+
+function ensureValidAudioSlot() {
+  const preferred = getAudibleSlotKey();
+  if (preferred !== null || state.audioSlotKey === null) {
+    return;
+  }
+
+  const fallback = getActiveSlots().find((slot) => slot.file)?.slotKey ?? null;
+  state.audioSlotKey = fallback;
+}
+
+function getAudibleSlotKey() {
+  if (state.audioSlotKey === null) {
+    return null;
+  }
+
+  const slot = state.slots[state.audioSlotKey];
+  if (!slot) {
+    return null;
+  }
+
+  const isActive = state.mode === "compare" || state.audioSlotKey === "left";
+  if (!isActive || !slot.file) {
+    return null;
+  }
+
+  return state.audioSlotKey;
+}
+
+function getAudibleSlot() {
+  const audibleSlotKey = getAudibleSlotKey();
+  return audibleSlotKey ? state.slots[audibleSlotKey] : null;
+}
+
+function isAudioMasterSlot(slot) {
+  return state.playing && getAudibleSlotKey() === slot.slotKey;
+}
+
 function getSlotTargetTime(slot, timelineTime) {
   return clamp(timelineTime, 0, slot.duration);
+}
+
+function getSlotTimelineTime(slot) {
+  return clamp(slot.elements.video.currentTime, 0, slot.duration);
 }
 
 function isSlotActiveAtTimelineTime(slot, timelineTime) {
@@ -762,6 +854,11 @@ function clearSlotMedia(slot) {
 
   fileMeta.textContent = "No file selected";
   timeReadout.textContent = "00:00.00";
+  if (state.audioSlotKey === slot.slotKey) {
+    state.audioSlotKey = getActiveSlots().find((candidate) => candidate.slotKey !== slot.slotKey && candidate.file)?.slotKey ?? null;
+    syncAudio();
+    persistTransportState();
+  }
 }
 
 function getActiveSlots() {
@@ -919,6 +1016,16 @@ function normalizePlaybackRate(value) {
   const allowedRates = [0.25, 0.5, 0.75, 1];
   const parsed = Number(value);
   return allowedRates.includes(parsed) ? parsed : 1;
+}
+
+function normalizeAudioSlotKey(value) {
+  if (value === null) {
+    return null;
+  }
+  if (value === "left" || value === "right") {
+    return value;
+  }
+  return "left";
 }
 
 function normalizeZoomScale(value) {
