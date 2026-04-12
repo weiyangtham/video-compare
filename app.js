@@ -1,12 +1,15 @@
 const STORAGE_PREFIX = "video-compare/v1";
-const SEEK_STEP_SECONDS = 0.1;
+const DEFAULT_SEEK_STEP_SECONDS = 0.1;
 const SEEK_LARGE_STEP_SECONDS = 1;
+const MIN_SEEK_STEP_SECONDS = 0.01;
+const MAX_SEEK_STEP_SECONDS = 5;
 
 const state = {
   mode: "single",
   timelineTime: 0,
   playing: false,
   playbackRate: 1,
+  seekStepSeconds: DEFAULT_SEEK_STEP_SECONDS,
   audioSlotKey: "left",
   duration: 0,
   loopStart: null,
@@ -19,6 +22,8 @@ const state = {
   activeScrubber: null,
   activePan: null,
   openSettingsSlot: null,
+  openSettingsPanel: "menu",
+  settingsTransitionDirection: "forward",
   slots: {
     left: createSlotState("left"),
     right: createSlotState("right"),
@@ -57,6 +62,13 @@ const elements = {
     zoomReadout: document.getElementById(`${prefix}ZoomReadout`),
     settingsButton: document.getElementById(`${prefix}SettingsButton`),
     settingsMenu: document.getElementById(`${prefix}SettingsMenu`),
+    settingsPanels: Array.from(document.querySelectorAll(`#${prefix}SettingsMenu [data-settings-panel]`)),
+    settingsNavButtons: Array.from(document.querySelectorAll(`#${prefix}SettingsMenu [data-settings-panel-target]`)),
+    settingsBackButtons: Array.from(document.querySelectorAll(`#${prefix}SettingsMenu .settings-back-button`)),
+    seekStepButtons: Array.from(document.querySelectorAll(`#${prefix}SettingsMenu [data-seek-step]`)),
+    settingsSummaryPlayback: document.querySelector(`#${prefix}SettingsMenu [data-settings-summary="playback"]`),
+    settingsSummarySeek: document.querySelector(`#${prefix}SettingsMenu [data-settings-summary="seek"]`),
+    settingsSeekInput: document.querySelector(`#${prefix}SettingsMenu .settings-seek-input`),
     playbackRateButtons: Array.from(
       document.querySelectorAll(`#${prefix}SettingsMenu [data-playback-rate]`)
     ),
@@ -139,6 +151,10 @@ function bindSlotEvents(slotKey) {
     zoomResetButton,
     settingsButton,
     settingsMenu,
+    settingsNavButtons,
+    settingsBackButtons,
+    seekStepButtons,
+    settingsSeekInput,
     playbackRateButtons,
   } = slot.elements;
 
@@ -215,8 +231,8 @@ function bindSlotEvents(slotKey) {
   });
   bindScrubberGesture(timelineRange, slotKey);
   inlinePlayButton.addEventListener("click", togglePlayback);
-  stepBackButton.addEventListener("click", () => seekBy(-SEEK_STEP_SECONDS));
-  stepForwardButton.addEventListener("click", () => seekBy(SEEK_STEP_SECONDS));
+  stepBackButton.addEventListener("click", () => seekBy(-state.seekStepSeconds));
+  stepForwardButton.addEventListener("click", () => seekBy(state.seekStepSeconds));
   captureStillButton.addEventListener("click", () => {
     void captureStill(slotKey);
   });
@@ -235,11 +251,40 @@ function bindSlotEvents(slotKey) {
   settingsMenu.addEventListener("click", (event) => {
     event.stopPropagation();
   });
+  settingsNavButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+      state.settingsTransitionDirection = "forward";
+      state.openSettingsPanel = button.dataset.settingsPanelTarget || "menu";
+      render();
+    });
+  });
+  settingsBackButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+      state.settingsTransitionDirection = "back";
+      state.openSettingsPanel = "menu";
+      render();
+    });
+  });
   playbackRateButtons.forEach((button) => {
     button.addEventListener("click", () => {
       setPlaybackRate(Number(button.dataset.playbackRate));
       closeSettingsMenu();
     });
+  });
+  seekStepButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+      setSeekStep(Number(button.dataset.seekStep));
+      closeSettingsMenu();
+    });
+  });
+  settingsSeekInput.addEventListener("input", (event) => {
+    setSeekStep(Number(event.target.value), { persist: false, rerender: false });
+    syncSettingsSeekInputs();
+    updateSeekControls();
+  });
+  settingsSeekInput.addEventListener("change", (event) => {
+    setSeekStep(Number(event.target.value));
+    closeSettingsMenu();
   });
 
   dropZone.addEventListener(
@@ -502,7 +547,6 @@ function render() {
   elements.leftPanelTitle.textContent = isCompareMode ? "Primary Video" : "Video";
   elements.rightPanelTitle.textContent = "Compare Video";
   elements.playbackRateSelect.value = String(state.playbackRate);
-
   Object.values(state.slots).forEach((slot) => {
     const slotTime = clamp(state.timelineTime, 0, slot.duration || 0);
     const scrubberProgress = slot.duration ? (slotTime / slot.duration) * 100 : 0;
@@ -519,6 +563,16 @@ function render() {
       `${state.playing ? "Pause" : "Play"} synced videos`
     );
     slot.elements.inlinePlayButton.disabled = !state.duration;
+    slot.elements.stepBackButton.textContent = `-${formatSeekStepLabel(state.seekStepSeconds)}`;
+    slot.elements.stepForwardButton.textContent = `+${formatSeekStepLabel(state.seekStepSeconds)}`;
+    slot.elements.stepBackButton.setAttribute(
+      "aria-label",
+      `Step back ${formatSeekStepSpoken(state.seekStepSeconds)}`
+    );
+    slot.elements.stepForwardButton.setAttribute(
+      "aria-label",
+      `Step forward ${formatSeekStepSpoken(state.seekStepSeconds)}`
+    );
     slot.elements.stepBackButton.disabled = !state.duration;
     slot.elements.stepForwardButton.disabled = !state.duration;
     slot.elements.captureStillButton.disabled = !slot.file || slot.captureBusy;
@@ -535,11 +589,29 @@ function render() {
     slot.elements.settingsButton.disabled = !state.duration;
     slot.elements.settingsButton.setAttribute("aria-expanded", String(state.openSettingsSlot === slot.slotKey));
     slot.elements.settingsMenu.hidden = state.openSettingsSlot !== slot.slotKey;
+    slot.elements.settingsPanels.forEach((panel) => {
+      const panelName = panel.dataset.settingsPanel;
+      const isActive = panelName === state.openSettingsPanel;
+      panel.hidden = false;
+      panel.classList.toggle("is-active", isActive);
+      panel.classList.toggle("is-before", isSettingsPanelBefore(panelName, state.openSettingsPanel));
+      panel.classList.toggle("is-after", isSettingsPanelAfter(panelName, state.openSettingsPanel));
+      panel.classList.toggle("is-transition-back", state.settingsTransitionDirection === "back");
+    });
+    slot.elements.settingsSummaryPlayback.textContent = `${formatPlaybackRateLabel(state.playbackRate)}x`;
+    slot.elements.settingsSummarySeek.textContent = formatSeekStepLabel(state.seekStepSeconds);
     slot.elements.playbackRateButtons.forEach((button) => {
       const isActive = Number(button.dataset.playbackRate) === state.playbackRate;
       button.classList.toggle("is-active", isActive);
       button.setAttribute("aria-pressed", String(isActive));
     });
+    slot.elements.seekStepButtons.forEach((button) => {
+      const isActive = Number(button.dataset.seekStep) === state.seekStepSeconds;
+      button.classList.toggle("is-active", isActive);
+      button.setAttribute("aria-pressed", String(isActive));
+    });
+    slot.elements.settingsSeekInput.value = formatSeekStepValue(state.seekStepSeconds);
+    updateSettingsMenuHeight(slot);
     slot.elements.zoomReadout.textContent = `${Math.round(slot.zoomScale * 100)}%`;
     slot.elements.videoStage.style.transform = `translate(${slot.panX}px, ${slot.panY}px) scale(${slot.zoomScale})`;
     slot.elements.dropZone.classList.toggle("has-video", Boolean(slot.file));
@@ -571,6 +643,7 @@ function persistTransportState() {
       loopStart: state.loopStart,
       loopEnd: state.loopEnd,
       playbackRate: state.playbackRate,
+      seekStepSeconds: state.seekStepSeconds,
       audioSlotKey: state.audioSlotKey,
     })
   );
@@ -596,11 +669,13 @@ function loadTransportState() {
     state.loopStart = parsed.loopStart ?? null;
     state.loopEnd = parsed.loopEnd ?? null;
     state.playbackRate = normalizePlaybackRate(parsed.playbackRate);
+    state.seekStepSeconds = normalizeSeekStep(parsed.seekStepSeconds);
     state.audioSlotKey = normalizeAudioSlotKey(parsed.audioSlotKey);
   } catch (_) {
     state.loopStart = null;
     state.loopEnd = null;
     state.playbackRate = 1;
+    state.seekStepSeconds = DEFAULT_SEEK_STEP_SECONDS;
     state.audioSlotKey = "left";
   }
 }
@@ -618,6 +693,8 @@ function toggleMode() {
 
 function toggleSettingsMenu(slotKey) {
   state.openSettingsSlot = state.openSettingsSlot === slotKey ? null : slotKey;
+  state.openSettingsPanel = "menu";
+  state.settingsTransitionDirection = "forward";
   render();
 }
 
@@ -626,6 +703,8 @@ function closeSettingsMenu() {
     return;
   }
   state.openSettingsSlot = null;
+  state.openSettingsPanel = "menu";
+  state.settingsTransitionDirection = "forward";
   render();
 }
 
@@ -651,7 +730,7 @@ function handleDocumentKeydown(event) {
 
   if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
     event.preventDefault();
-    const step = event.shiftKey ? SEEK_LARGE_STEP_SECONDS : SEEK_STEP_SECONDS;
+    const step = event.shiftKey ? Math.max(SEEK_LARGE_STEP_SECONDS, state.seekStepSeconds) : state.seekStepSeconds;
     const direction = event.key === "ArrowLeft" ? -1 : 1;
     seekBy(step * direction);
   }
@@ -659,6 +738,31 @@ function handleDocumentKeydown(event) {
 
 function seekBy(deltaSeconds) {
   seekTo(state.timelineTime + deltaSeconds);
+}
+
+function setSeekStep(nextStep, { persist = true, rerender = true } = {}) {
+  if (!Number.isFinite(nextStep)) {
+    syncSettingsSeekInputs();
+    return;
+  }
+
+  const normalized = normalizeSeekStep(nextStep);
+  if (normalized === state.seekStepSeconds) {
+    syncSettingsSeekInputs();
+    return;
+  }
+
+  state.seekStepSeconds = normalized;
+  if (persist) {
+    persistTransportState();
+  }
+  if (rerender) {
+    render();
+    return;
+  }
+
+  syncSettingsSeekInputs();
+  updateSeekControls();
 }
 
 function persistSlotState(slotKey) {
@@ -911,6 +1015,97 @@ function resetZoom(slotKey) {
     state.activePan = null;
   }
   setZoom(slotKey, 1);
+}
+
+function normalizeSeekStep(value) {
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue)) {
+    return DEFAULT_SEEK_STEP_SECONDS;
+  }
+
+  return clamp(roundTo(numericValue, 2), MIN_SEEK_STEP_SECONDS, MAX_SEEK_STEP_SECONDS);
+}
+
+function formatSeekStepValue(value) {
+  return roundTo(value, 2).toFixed(2).replace(/\.?0+$/, "");
+}
+
+function formatSeekStepLabel(value) {
+  return `${formatSeekStepValue(value)}s`;
+}
+
+function formatSeekStepSpoken(value) {
+  return `${formatSeekStepValue(value)} seconds`;
+}
+
+function formatPlaybackRateLabel(value) {
+  return Number.isInteger(value) ? String(value) : String(value).replace(/\.0$/, "");
+}
+
+function updateSettingsMenuHeight(slot) {
+  if (slot.elements.settingsMenu.hidden) {
+    slot.elements.settingsMenu.style.height = "";
+    return;
+  }
+
+  const activePanel = slot.elements.settingsPanels.find(
+    (panel) => panel.dataset.settingsPanel === state.openSettingsPanel
+  );
+
+  if (!activePanel) {
+    slot.elements.settingsMenu.style.height = "";
+    return;
+  }
+
+  slot.elements.settingsMenu.style.height = `${Math.ceil(activePanel.scrollHeight)}px`;
+}
+
+function getSettingsPanelOrder(panelName) {
+  if (panelName === "menu") {
+    return 0;
+  }
+
+  return 1;
+}
+
+function isSettingsPanelBefore(panelName, activePanelName) {
+  return getSettingsPanelOrder(panelName) < getSettingsPanelOrder(activePanelName);
+}
+
+function isSettingsPanelAfter(panelName, activePanelName) {
+  return getSettingsPanelOrder(panelName) > getSettingsPanelOrder(activePanelName);
+}
+
+function syncSettingsSeekInputs() {
+  Object.values(state.slots).forEach((slot) => {
+    slot.elements.settingsSeekInput.value = formatSeekStepValue(state.seekStepSeconds);
+  });
+}
+
+function updateSeekControls() {
+  Object.values(state.slots).forEach((slot) => {
+    slot.elements.stepBackButton.textContent = `-${formatSeekStepLabel(state.seekStepSeconds)}`;
+    slot.elements.stepForwardButton.textContent = `+${formatSeekStepLabel(state.seekStepSeconds)}`;
+    slot.elements.stepBackButton.setAttribute(
+      "aria-label",
+      `Step back ${formatSeekStepSpoken(state.seekStepSeconds)}`
+    );
+    slot.elements.stepForwardButton.setAttribute(
+      "aria-label",
+      `Step forward ${formatSeekStepSpoken(state.seekStepSeconds)}`
+    );
+    slot.elements.settingsSummarySeek.textContent = formatSeekStepLabel(state.seekStepSeconds);
+    slot.elements.seekStepButtons.forEach((button) => {
+      const isActive = Number(button.dataset.seekStep) === state.seekStepSeconds;
+      button.classList.toggle("is-active", isActive);
+      button.setAttribute("aria-pressed", String(isActive));
+    });
+  });
+}
+
+function roundTo(value, precision) {
+  const multiplier = 10 ** precision;
+  return Math.round(value * multiplier) / multiplier;
 }
 
 function setZoom(slotKey, scale, anchor = null) {

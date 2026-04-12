@@ -101,12 +101,54 @@
                   ⚙
                 </button>
                 <div id="leftSettingsMenu" class="settings-menu" hidden>
-                  <p class="settings-title">Playback speed</p>
-                  <div class="settings-option-list" role="group" aria-label="Playback speed">
-                    <button type="button" class="settings-option" data-playback-rate="0.25">0.25x</button>
-                    <button type="button" class="settings-option" data-playback-rate="0.5">0.5x</button>
-                    <button type="button" class="settings-option" data-playback-rate="0.75">0.75x</button>
-                    <button type="button" class="settings-option" data-playback-rate="1">1x</button>
+                  <div class="settings-panel" data-settings-panel="menu">
+                    <div class="settings-panel-header">
+                      <p class="settings-title">Settings</p>
+                    </div>
+                    <div class="settings-option-list" role="group" aria-label="Video settings">
+                      <button type="button" class="settings-option settings-nav-button" data-settings-panel-target="playback">
+                        <span>Playback speed</span>
+                        <span class="settings-option-meta">
+                          <span class="settings-option-value" data-settings-summary="playback">1x</span>
+                          <span class="settings-option-chevron" aria-hidden="true">›</span>
+                        </span>
+                      </button>
+                      <button type="button" class="settings-option settings-nav-button" data-settings-panel-target="seek">
+                        <span>Seek increment</span>
+                        <span class="settings-option-meta">
+                          <span class="settings-option-value" data-settings-summary="seek">0.1s</span>
+                          <span class="settings-option-chevron" aria-hidden="true">›</span>
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+                  <div class="settings-panel" data-settings-panel="playback" hidden>
+                    <div class="settings-panel-header">
+                      <button type="button" class="settings-back-button" aria-label="Back to settings">‹</button>
+                      <p class="settings-title">Playback speed</p>
+                    </div>
+                    <div class="settings-option-list" role="group" aria-label="Playback speed">
+                      <button type="button" class="settings-option" data-playback-rate="0.25">0.25x</button>
+                      <button type="button" class="settings-option" data-playback-rate="0.5">0.5x</button>
+                      <button type="button" class="settings-option" data-playback-rate="0.75">0.75x</button>
+                      <button type="button" class="settings-option" data-playback-rate="1">1x</button>
+                    </div>
+                  </div>
+                  <div class="settings-panel" data-settings-panel="seek" hidden>
+                    <div class="settings-panel-header">
+                      <button type="button" class="settings-back-button" aria-label="Back to settings">‹</button>
+                      <p class="settings-title">Seek increment</p>
+                    </div>
+                    <div class="settings-option-list" role="group" aria-label="Seek increment presets">
+                      <button type="button" class="settings-option" data-seek-step="0.01">0.01s</button>
+                      <button type="button" class="settings-option" data-seek-step="0.04">0.04s</button>
+                      <button type="button" class="settings-option" data-seek-step="0.1">0.1s</button>
+                      <button type="button" class="settings-option" data-seek-step="0.25">0.25s</button>
+                    </div>
+                    <label class="speed-control seek-step-control">
+                      <span class="transport-label">Custom</span>
+                      <input type="number" class="settings-seek-input" min="0.01" max="5" step="0.01" value="0.1" inputmode="decimal" />
+                    </label>
                   </div>
                 </div>
               </div>
@@ -191,12 +233,54 @@
                   ⚙
                 </button>
                 <div id="rightSettingsMenu" class="settings-menu" hidden>
-                  <p class="settings-title">Playback speed</p>
-                  <div class="settings-option-list" role="group" aria-label="Playback speed">
-                    <button type="button" class="settings-option" data-playback-rate="0.25">0.25x</button>
-                    <button type="button" class="settings-option" data-playback-rate="0.5">0.5x</button>
-                    <button type="button" class="settings-option" data-playback-rate="0.75">0.75x</button>
-                    <button type="button" class="settings-option" data-playback-rate="1">1x</button>
+                  <div class="settings-panel" data-settings-panel="menu">
+                    <div class="settings-panel-header">
+                      <p class="settings-title">Settings</p>
+                    </div>
+                    <div class="settings-option-list" role="group" aria-label="Video settings">
+                      <button type="button" class="settings-option settings-nav-button" data-settings-panel-target="playback">
+                        <span>Playback speed</span>
+                        <span class="settings-option-meta">
+                          <span class="settings-option-value" data-settings-summary="playback">1x</span>
+                          <span class="settings-option-chevron" aria-hidden="true">›</span>
+                        </span>
+                      </button>
+                      <button type="button" class="settings-option settings-nav-button" data-settings-panel-target="seek">
+                        <span>Seek increment</span>
+                        <span class="settings-option-meta">
+                          <span class="settings-option-value" data-settings-summary="seek">0.1s</span>
+                          <span class="settings-option-chevron" aria-hidden="true">›</span>
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+                  <div class="settings-panel" data-settings-panel="playback" hidden>
+                    <div class="settings-panel-header">
+                      <button type="button" class="settings-back-button" aria-label="Back to settings">‹</button>
+                      <p class="settings-title">Playback speed</p>
+                    </div>
+                    <div class="settings-option-list" role="group" aria-label="Playback speed">
+                      <button type="button" class="settings-option" data-playback-rate="0.25">0.25x</button>
+                      <button type="button" class="settings-option" data-playback-rate="0.5">0.5x</button>
+                      <button type="button" class="settings-option" data-playback-rate="0.75">0.75x</button>
+                      <button type="button" class="settings-option" data-playback-rate="1">1x</button>
+                    </div>
+                  </div>
+                  <div class="settings-panel" data-settings-panel="seek" hidden>
+                    <div class="settings-panel-header">
+                      <button type="button" class="settings-back-button" aria-label="Back to settings">‹</button>
+                      <p class="settings-title">Seek increment</p>
+                    </div>
+                    <div class="settings-option-list" role="group" aria-label="Seek increment presets">
+                      <button type="button" class="settings-option" data-seek-step="0.01">0.01s</button>
+                      <button type="button" class="settings-option" data-seek-step="0.04">0.04s</button>
+                      <button type="button" class="settings-option" data-seek-step="0.1">0.1s</button>
+                      <button type="button" class="settings-option" data-seek-step="0.25">0.25s</button>
+                    </div>
+                    <label class="speed-control seek-step-control">
+                      <span class="transport-label">Custom</span>
+                      <input type="number" class="settings-seek-input" min="0.01" max="5" step="0.01" value="0.1" inputmode="decimal" />
+                    </label>
                   </div>
                 </div>
               </div>
