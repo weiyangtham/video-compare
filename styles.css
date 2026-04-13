@@ -95,11 +95,25 @@ h1 {
   min-width: 260px;
 }
 
+.hero-action-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .hero-compare-button {
   padding-inline: 16px;
   color: var(--muted);
   border-color: rgba(174, 198, 255, 0.14);
   background: rgba(255, 255, 255, 0.03);
+}
+
+.hero-shortcut-button {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  font-size: 1.1rem;
+  line-height: 1;
 }
 
 .hero-status {
@@ -111,11 +125,43 @@ h1 {
   color: var(--muted);
 }
 
+.shortcut-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.shortcut-dialog[hidden] {
+  display: none;
+}
+
+.shortcut-dialog-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(5, 8, 14, 0.72);
+  backdrop-filter: blur(6px);
+}
+
 .shortcut-guide {
   display: grid;
   gap: 12px;
-  margin-bottom: 18px;
   padding: 16px 18px;
+}
+
+.shortcut-guide-dialog {
+  position: relative;
+  z-index: 1;
+  width: min(720px, 100%);
+}
+
+.shortcut-guide-header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 .shortcut-guide-title,
@@ -150,6 +196,10 @@ h1 {
   border: 1px solid rgba(174, 198, 255, 0.12);
   color: var(--text);
   font-size: 0.86rem;
+}
+
+.shortcut-close-button {
+  white-space: nowrap;
 }
 
 kbd {
@@ -998,6 +1048,10 @@ textarea {
     min-width: 0;
   }
 
+  .hero-action-row {
+    justify-content: flex-start;
+  }
+
   .transport-row {
     grid-template-columns: 1fr;
   }
@@ -1005,6 +1059,10 @@ textarea {
   .transport-group-speed,
   .transport-group-loop {
     width: 100%;
+  }
+
+  .shortcut-guide-header {
+    flex-direction: column;
   }
 
   .video-toolbar {
@@ -1063,5 +1121,9 @@ textarea {
     left: 0;
     right: 0;
     width: auto;
+  }
+
+  .shortcut-dialog {
+    padding: 14px;
   }
 }

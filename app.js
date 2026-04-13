@@ -24,6 +24,7 @@ const state = {
   activePan: null,
   openSettingsSlot: null,
   openSettingsPanel: "menu",
+  shortcutDialogOpen: false,
   settingsTransitionDirection: "forward",
   slots: {
     left: createSlotState("left"),
@@ -37,6 +38,9 @@ const elements = {
   playbackRateSelect: document.getElementById("playbackRateSelect"),
   loopActionButtons: Array.from(document.querySelectorAll("[data-loop-action]")),
   modeToggleButton: document.getElementById("modeToggleButton"),
+  shortcutHelpButton: document.getElementById("shortcutHelpButton"),
+  shortcutHelpDialog: document.getElementById("shortcutHelpDialog"),
+  shortcutHelpCloseButton: document.getElementById("shortcutHelpCloseButton"),
   leftPanelTitle: document.getElementById("leftPanelTitle"),
   rightPanelTitle: document.getElementById("rightPanelTitle"),
   shortcutActivePanel: document.getElementById("shortcutActivePanel"),
@@ -123,6 +127,8 @@ function bindGlobalEvents() {
     });
   });
   elements.modeToggleButton.addEventListener("click", toggleMode);
+  elements.shortcutHelpButton.addEventListener("click", toggleShortcutDialog);
+  elements.shortcutHelpCloseButton.addEventListener("click", closeShortcutDialog);
   document.addEventListener("click", handleDocumentClick);
   document.addEventListener("keydown", handleDocumentKeydown);
 }
@@ -547,9 +553,11 @@ function render() {
   elements.modeToggleButton.setAttribute("aria-pressed", String(isCompareMode));
   elements.modeToggleButton.classList.toggle("primary", isCompareMode);
   elements.modeToggleButton.classList.toggle("ghost", !isCompareMode);
+  elements.shortcutHelpButton.setAttribute("aria-expanded", String(state.shortcutDialogOpen));
   elements.leftPanelTitle.textContent = isCompareMode ? "Primary Video" : "Video";
   elements.rightPanelTitle.textContent = "Compare Video";
   elements.shortcutActivePanel.textContent = isCompareMode ? capitalize(activeSlotKey) : "Primary";
+  elements.shortcutHelpDialog.hidden = !state.shortcutDialogOpen;
   elements.playbackRateSelect.value = String(state.playbackRate);
   Object.values(state.slots).forEach((slot) => {
     const slotTime = clamp(state.timelineTime, 0, slot.duration || 0);
@@ -716,15 +724,33 @@ function closeSettingsMenu() {
   render();
 }
 
+function toggleShortcutDialog() {
+  state.shortcutDialogOpen = !state.shortcutDialogOpen;
+  render();
+}
+
+function closeShortcutDialog() {
+  if (!state.shortcutDialogOpen) {
+    return;
+  }
+  state.shortcutDialogOpen = false;
+  render();
+}
+
 function handleDocumentClick(event) {
   if (!event.target.closest(".video-settings")) {
     closeSettingsMenu();
+  }
+
+  if (event.target.closest("[data-shortcut-close]")) {
+    closeShortcutDialog();
   }
 }
 
 function handleDocumentKeydown(event) {
   if (event.key === "Escape") {
     closeSettingsMenu();
+    closeShortcutDialog();
     return;
   }
 
@@ -758,7 +784,7 @@ function handleDocumentKeydown(event) {
     return;
   }
 
-  if (event.key === "Backspace" || event.key === "Delete" || event.key.toLowerCase() === "c") {
+  if (event.key.toLowerCase() === "c") {
     event.preventDefault();
     clearLoopPoints();
     return;

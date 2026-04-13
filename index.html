@@ -17,28 +17,55 @@
           </p>
         </div>
         <div class="hero-actions">
-          <button id="modeToggleButton" class="ghost hero-compare-button" type="button">Enable Compare</button>
+          <div class="hero-action-row">
+            <button
+              id="shortcutHelpButton"
+              class="ghost hero-shortcut-button"
+              type="button"
+              aria-label="Show keyboard shortcuts"
+              aria-haspopup="dialog"
+              aria-expanded="false"
+            >
+              ⌨
+            </button>
+            <button id="modeToggleButton" class="ghost hero-compare-button" type="button">Enable Compare</button>
+          </div>
           <div class="hero-status" id="statusBanner">Load a video to begin.</div>
         </div>
       </header>
 
-      <section class="shortcut-guide card" aria-label="Keyboard shortcuts">
-        <p class="shortcut-guide-title">Keyboard shortcuts</p>
-        <p class="shortcut-guide-copy">
-          Click a video panel to target panel-specific shortcuts. Active panel:
-          <strong id="shortcutActivePanel">Primary</strong>
-        </p>
-        <div class="shortcut-list" role="list">
-          <span class="shortcut-chip" role="listitem"><kbd>Space</kbd> Play or pause</span>
-          <span class="shortcut-chip" role="listitem"><kbd>←</kbd><kbd>→</kbd> Step by seek amount</span>
-          <span class="shortcut-chip" role="listitem"><kbd>Shift</kbd><kbd>←</kbd><kbd>→</kbd> Step 1 second</span>
-          <span class="shortcut-chip" role="listitem"><kbd>[</kbd><kbd>]</kbd> Set loop start and end</span>
-          <span class="shortcut-chip" role="listitem"><kbd>C</kbd> or <kbd>Backspace</kbd> Clear loop</span>
-          <span class="shortcut-chip" role="listitem"><kbd>M</kbd> Toggle panel audio</span>
-          <span class="shortcut-chip" role="listitem"><kbd>V</kbd> Toggle compare mode</span>
-          <span class="shortcut-chip" role="listitem"><kbd>+</kbd><kbd>-</kbd><kbd>0</kbd> Zoom active panel</span>
-        </div>
-      </section>
+      <div id="shortcutHelpDialog" class="shortcut-dialog" role="dialog" aria-modal="true" aria-labelledby="shortcutHelpTitle" hidden>
+        <div class="shortcut-dialog-backdrop" data-shortcut-close="true"></div>
+        <section class="shortcut-guide card shortcut-guide-dialog" aria-label="Keyboard shortcuts">
+          <div class="shortcut-guide-header">
+            <div>
+              <p class="shortcut-guide-title" id="shortcutHelpTitle">Keyboard shortcuts</p>
+              <p class="shortcut-guide-copy">
+                Click a video panel to target panel-specific shortcuts. Active panel:
+                <strong id="shortcutActivePanel">Primary</strong>
+              </p>
+            </div>
+            <button
+              id="shortcutHelpCloseButton"
+              type="button"
+              class="ghost shortcut-close-button"
+              aria-label="Close keyboard shortcuts"
+            >
+              Close
+            </button>
+          </div>
+          <div class="shortcut-list" role="list">
+            <span class="shortcut-chip" role="listitem"><kbd>Space</kbd> Play or pause</span>
+            <span class="shortcut-chip" role="listitem"><kbd>←</kbd><kbd>→</kbd> Step by seek amount</span>
+            <span class="shortcut-chip" role="listitem"><kbd>Shift</kbd><kbd>←</kbd><kbd>→</kbd> Step 1 second</span>
+            <span class="shortcut-chip" role="listitem"><kbd>[</kbd><kbd>]</kbd> Set loop start and end</span>
+            <span class="shortcut-chip" role="listitem"><kbd>C</kbd> Clear loop</span>
+            <span class="shortcut-chip" role="listitem"><kbd>M</kbd> Toggle panel audio</span>
+            <span class="shortcut-chip" role="listitem"><kbd>V</kbd> Toggle compare mode</span>
+            <span class="shortcut-chip" role="listitem"><kbd>+</kbd><kbd>-</kbd><kbd>0</kbd> Zoom active panel</span>
+          </div>
+        </section>
+      </div>
 
       <main class="layout">
         <section class="video-grid">
