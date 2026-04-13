@@ -1,6 +1,5 @@
 const STORAGE_PREFIX = "video-compare/v1";
 const DEFAULT_SEEK_STEP_SECONDS = 0.1;
-const SEEK_LARGE_STEP_SECONDS = 1;
 const MIN_SEEK_STEP_SECONDS = 0.01;
 const MAX_SEEK_STEP_SECONDS = 5;
 
@@ -766,9 +765,8 @@ function handleDocumentKeydown(event) {
 
   if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
     event.preventDefault();
-    const step = event.shiftKey ? Math.max(SEEK_LARGE_STEP_SECONDS, state.seekStepSeconds) : state.seekStepSeconds;
     const direction = event.key === "ArrowLeft" ? -1 : 1;
-    seekBy(step * direction);
+    seekBy(state.seekStepSeconds * direction);
     return;
   }
 
