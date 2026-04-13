@@ -11,6 +11,7 @@ const state = {
   playbackRate: 1,
   seekStepSeconds: DEFAULT_SEEK_STEP_SECONDS,
   audioSlotKey: "left",
+  activeSlotKey: "left",
   duration: 0,
   loopStart: null,
   loopEnd: null,
@@ -38,11 +39,13 @@ const elements = {
   modeToggleButton: document.getElementById("modeToggleButton"),
   leftPanelTitle: document.getElementById("leftPanelTitle"),
   rightPanelTitle: document.getElementById("rightPanelTitle"),
+  shortcutActivePanel: document.getElementById("shortcutActivePanel"),
 };
 
 ["left", "right"].forEach((slotKey) => {
   const prefix = slotKey;
   state.slots[slotKey].elements = {
+    panel: document.querySelector(`[data-slot="${prefix}"]`),
     fileInput: document.getElementById(`${prefix}FileInput`),
     video: document.getElementById(`${prefix}Video`),
     videoStage: document.getElementById(`${prefix}VideoStage`),
@@ -111,21 +114,12 @@ function bindGlobalEvents() {
     button.addEventListener("click", () => {
       const action = button.dataset.loopAction;
       if (action === "start") {
-        state.loopStart = state.timelineTime;
-        if (state.loopEnd !== null && state.loopEnd < state.loopStart) {
-          state.loopEnd = null;
-        }
+        setLoopPoint("start");
       } else if (action === "end") {
-        state.loopEnd = state.timelineTime;
-        if (state.loopStart !== null && state.loopEnd < state.loopStart) {
-          state.loopStart = state.loopEnd;
-        }
+        setLoopPoint("end");
       } else if (action === "clear") {
-        state.loopStart = null;
-        state.loopEnd = null;
+        clearLoopPoints();
       }
-      persistTransportState();
-      render();
     });
   });
   elements.modeToggleButton.addEventListener("click", toggleMode);
@@ -136,6 +130,7 @@ function bindGlobalEvents() {
 function bindSlotEvents(slotKey) {
   const slot = state.slots[slotKey];
   const {
+    panel,
     fileInput,
     video,
     dropZone,
@@ -157,6 +152,13 @@ function bindSlotEvents(slotKey) {
     settingsSeekInput,
     playbackRateButtons,
   } = slot.elements;
+
+  panel.addEventListener("pointerdown", () => {
+    setActiveSlot(slotKey);
+  });
+  panel.addEventListener("focusin", () => {
+    setActiveSlot(slotKey);
+  });
 
   fileInput.addEventListener("change", async (event) => {
     const [file] = event.target.files || [];
@@ -538,6 +540,7 @@ function render() {
   const isSingleMode = state.mode === "single";
   const isCompareMode = state.mode === "compare";
   const audibleSlotKey = getAudibleSlotKey();
+  const activeSlotKey = getShortcutSlotKey();
   elements.appShell.classList.toggle("single-mode", isSingleMode);
   elements.appShell.classList.toggle("compare-mode", isCompareMode);
   elements.modeToggleButton.textContent = isCompareMode ? "Back to Solo" : "Enable Compare";
@@ -546,6 +549,7 @@ function render() {
   elements.modeToggleButton.classList.toggle("ghost", !isCompareMode);
   elements.leftPanelTitle.textContent = isCompareMode ? "Primary Video" : "Video";
   elements.rightPanelTitle.textContent = "Compare Video";
+  elements.shortcutActivePanel.textContent = isCompareMode ? capitalize(activeSlotKey) : "Primary";
   elements.playbackRateSelect.value = String(state.playbackRate);
   Object.values(state.slots).forEach((slot) => {
     const slotTime = clamp(state.timelineTime, 0, slot.duration || 0);
@@ -614,6 +618,7 @@ function render() {
     updateSettingsMenuHeight(slot);
     slot.elements.zoomReadout.textContent = `${Math.round(slot.zoomScale * 100)}%`;
     slot.elements.videoStage.style.transform = `translate(${slot.panX}px, ${slot.panY}px) scale(${slot.zoomScale})`;
+    slot.elements.panel.classList.toggle("is-active-panel", slot.slotKey === activeSlotKey);
     slot.elements.dropZone.classList.toggle("has-video", Boolean(slot.file));
     slot.elements.dropZone.classList.toggle("zoomed", slot.zoomScale > 1.001);
     slot.elements.dropZone.classList.toggle("is-panning", state.activePan?.slotKey === slot.slotKey);
@@ -682,6 +687,9 @@ function loadTransportState() {
 
 function toggleMode() {
   state.mode = state.mode === "single" ? "compare" : "single";
+  if (state.mode === "single" || !state.slots[state.activeSlotKey]?.file) {
+    state.activeSlotKey = "left";
+  }
   closeSettingsMenu();
   recalculateSharedDuration();
   ensureValidAudioSlot();
@@ -720,11 +728,13 @@ function handleDocumentKeydown(event) {
     return;
   }
 
-  if (
-    event.target instanceof HTMLElement &&
-    (event.target.isContentEditable ||
-      ["INPUT", "TEXTAREA", "SELECT", "BUTTON"].includes(event.target.tagName))
-  ) {
+  if (shouldIgnoreShortcutKeydown(event)) {
+    return;
+  }
+
+  if (event.code === "Space") {
+    event.preventDefault();
+    togglePlayback();
     return;
   }
 
@@ -733,6 +743,54 @@ function handleDocumentKeydown(event) {
     const step = event.shiftKey ? Math.max(SEEK_LARGE_STEP_SECONDS, state.seekStepSeconds) : state.seekStepSeconds;
     const direction = event.key === "ArrowLeft" ? -1 : 1;
     seekBy(step * direction);
+    return;
+  }
+
+  if (event.key === "[" || event.key === "{") {
+    event.preventDefault();
+    setLoopPoint("start");
+    return;
+  }
+
+  if (event.key === "]" || event.key === "}") {
+    event.preventDefault();
+    setLoopPoint("end");
+    return;
+  }
+
+  if (event.key === "Backspace" || event.key === "Delete" || event.key.toLowerCase() === "c") {
+    event.preventDefault();
+    clearLoopPoints();
+    return;
+  }
+
+  if (event.key.toLowerCase() === "m") {
+    event.preventDefault();
+    toggleKeyboardAudio();
+    return;
+  }
+
+  if (event.key.toLowerCase() === "v") {
+    event.preventDefault();
+    toggleMode();
+    return;
+  }
+
+  if (event.key === "+" || (event.key === "=" && event.shiftKey)) {
+    event.preventDefault();
+    adjustZoom(getShortcutSlotKey(), ZOOM_STEP);
+    return;
+  }
+
+  if (event.key === "-" || event.key === "_") {
+    event.preventDefault();
+    adjustZoom(getShortcutSlotKey(), -ZOOM_STEP);
+    return;
+  }
+
+  if (event.key === "0") {
+    event.preventDefault();
+    resetZoom(getShortcutSlotKey());
   }
 }
 
@@ -872,6 +930,33 @@ function toggleSlotAudio(slotKey) {
   render();
 }
 
+function toggleKeyboardAudio() {
+  const activeSlotKey = getShortcutSlotKey();
+  const activeSlot = state.slots[activeSlotKey];
+  if (!activeSlot?.file) {
+    return;
+  }
+
+  if (state.mode === "single") {
+    toggleSlotAudio("left");
+    return;
+  }
+
+  const otherSlotKey = activeSlotKey === "left" ? "right" : "left";
+  const otherSlot = state.slots[otherSlotKey];
+
+  if (state.audioSlotKey === activeSlotKey) {
+    state.audioSlotKey = otherSlot.file ? otherSlotKey : null;
+  } else {
+    state.audioSlotKey = activeSlotKey;
+  }
+
+  ensureValidAudioSlot();
+  syncAudio();
+  persistTransportState();
+  render();
+}
+
 function syncAudio() {
   const audibleSlotKey = getAudibleSlotKey();
   Object.values(state.slots).forEach((slot) => {
@@ -982,6 +1067,10 @@ function clearSlotMedia(slot) {
   slot.panX = 0;
   slot.panY = 0;
   slot.captureBusy = false;
+
+  if (state.activeSlotKey === slot.slotKey) {
+    state.activeSlotKey = slot.slotKey === "right" ? "left" : state.activeSlotKey;
+  }
 
   fileMeta.textContent = "No file selected";
   timeReadout.textContent = "00:00.00";
@@ -1415,6 +1504,75 @@ function resetLoopIfOutOfBounds() {
     state.loopStart = null;
     state.loopEnd = null;
   }
+}
+
+function setLoopPoint(action) {
+  if (!state.duration) {
+    return;
+  }
+
+  if (action === "start") {
+    state.loopStart = state.timelineTime;
+    if (state.loopEnd !== null && state.loopEnd < state.loopStart) {
+      state.loopEnd = null;
+    }
+  } else if (action === "end") {
+    state.loopEnd = state.timelineTime;
+    if (state.loopStart !== null && state.loopEnd < state.loopStart) {
+      state.loopStart = state.loopEnd;
+    }
+  }
+
+  persistTransportState();
+  render();
+}
+
+function clearLoopPoints() {
+  if (state.loopStart === null && state.loopEnd === null) {
+    return;
+  }
+
+  state.loopStart = null;
+  state.loopEnd = null;
+  persistTransportState();
+  render();
+}
+
+function setActiveSlot(slotKey) {
+  if (!state.slots[slotKey]) {
+    return;
+  }
+
+  state.activeSlotKey = state.mode === "single" ? "left" : slotKey;
+  render();
+}
+
+function getShortcutSlotKey() {
+  if (state.mode === "single") {
+    return "left";
+  }
+
+  if (state.activeSlotKey === "right" && state.slots.right.file) {
+    return "right";
+  }
+
+  return "left";
+}
+
+function shouldIgnoreShortcutKeydown(event) {
+  if (!(event.target instanceof HTMLElement)) {
+    return false;
+  }
+
+  if (event.target.isContentEditable) {
+    return true;
+  }
+
+  if (["INPUT", "TEXTAREA", "SELECT"].includes(event.target.tagName)) {
+    return true;
+  }
+
+  return Boolean(event.target.closest(".settings-menu"));
 }
 
 function capitalize(value) {
