@@ -13,7 +13,7 @@
           <p class="eyebrow">Mac-friendly browser prototype</p>
           <h1>Video Compare</h1>
           <p class="hero-copy">
-            Load a local video, scrub precisely, adjust playback, and turn on compare mode only when you need it.
+            Load dance footage, scrub precisely, compare takes, and draw directly on the frame to track lines, posture, spacing, and timing.
           </p>
         </div>
         <div class="hero-actions">
@@ -62,6 +62,7 @@
             <span class="shortcut-chip" role="listitem"><kbd>M</kbd> Toggle panel audio</span>
             <span class="shortcut-chip" role="listitem"><kbd>V</kbd> Toggle compare mode</span>
             <span class="shortcut-chip" role="listitem"><kbd>+</kbd><kbd>-</kbd><kbd>0</kbd> Zoom active panel</span>
+            <span class="shortcut-chip" role="listitem">Use <strong>Trace</strong> or <strong>Line</strong> to mark body paths and angles</span>
           </div>
         </section>
       </div>
@@ -83,6 +84,7 @@
             <div class="video-frame" data-drop-zone="left">
               <div class="video-stage" id="leftVideoStage">
                 <video id="leftVideo" playsinline muted></video>
+                <canvas id="leftOverlayCanvas" class="overlay-canvas" aria-label="Left video drawing overlay"></canvas>
               </div>
               <div class="drop-hint" aria-hidden="true">Drop a video here</div>
               <div class="zoom-controls zoom-controls-overlay" aria-label="Left video zoom controls">
@@ -90,6 +92,21 @@
                 <button id="leftZoomOutButton" type="button" class="zoom-button" aria-label="Zoom out">-</button>
                 <button id="leftZoomResetButton" type="button" class="zoom-button zoom-button-wide" aria-label="Reset zoom">Reset</button>
                 <span id="leftZoomReadout" class="zoom-readout">100%</span>
+              </div>
+              <div id="leftDrawPalette" class="draw-overlay-panel" aria-label="Drawing tools" hidden>
+                <div class="draw-overlay-tools">
+                  <button id="leftDrawPenButton" type="button" class="draw-button" data-draw-tool="pen">Trace</button>
+                  <button id="leftDrawLineButton" type="button" class="draw-button" data-draw-tool="line">Line</button>
+                  <button id="leftDrawUndoButton" type="button" class="draw-button">Undo</button>
+                  <button id="leftDrawClearButton" type="button" class="draw-button">Clear</button>
+                  <button id="leftDrawDoneButton" type="button" class="draw-button draw-button-compact">Done</button>
+                </div>
+                <div class="draw-palette" aria-label="Drawing colors">
+                  <button id="leftColorAquaButton" type="button" class="draw-swatch" data-draw-color="#6dd3c7" aria-label="Aqua marker"></button>
+                  <button id="leftColorAmberButton" type="button" class="draw-swatch" data-draw-color="#f0b36b" aria-label="Amber marker"></button>
+                  <button id="leftColorRoseButton" type="button" class="draw-swatch" data-draw-color="#ff7f96" aria-label="Rose marker"></button>
+                  <button id="leftColorWhiteButton" type="button" class="draw-swatch" data-draw-color="#f5f7ff" aria-label="White marker"></button>
+                </div>
               </div>
               <div class="video-overlay">
                 <span id="leftTimeReadout">00:00.00</span>
@@ -124,6 +141,7 @@
                 <button id="leftCaptureStillButton" type="button" class="capture-button">Grab Still</button>
                 <button id="leftCaptureClipButton" type="button" class="capture-button">Grab Clip</button>
               </div>
+              <button id="leftDrawToggleButton" type="button" class="draw-toggle-button">Draw</button>
               <button
                 id="leftAudioButton"
                 type="button"
@@ -215,6 +233,7 @@
             <div class="video-frame" data-drop-zone="right">
               <div class="video-stage" id="rightVideoStage">
                 <video id="rightVideo" playsinline muted></video>
+                <canvas id="rightOverlayCanvas" class="overlay-canvas" aria-label="Right video drawing overlay"></canvas>
               </div>
               <div class="drop-hint" aria-hidden="true">Drop a video here</div>
               <div class="zoom-controls zoom-controls-overlay" aria-label="Right video zoom controls">
@@ -222,6 +241,21 @@
                 <button id="rightZoomOutButton" type="button" class="zoom-button" aria-label="Zoom out">-</button>
                 <button id="rightZoomResetButton" type="button" class="zoom-button zoom-button-wide" aria-label="Reset zoom">Reset</button>
                 <span id="rightZoomReadout" class="zoom-readout">100%</span>
+              </div>
+              <div id="rightDrawPalette" class="draw-overlay-panel" aria-label="Drawing tools" hidden>
+                <div class="draw-overlay-tools">
+                  <button id="rightDrawPenButton" type="button" class="draw-button" data-draw-tool="pen">Trace</button>
+                  <button id="rightDrawLineButton" type="button" class="draw-button" data-draw-tool="line">Line</button>
+                  <button id="rightDrawUndoButton" type="button" class="draw-button">Undo</button>
+                  <button id="rightDrawClearButton" type="button" class="draw-button">Clear</button>
+                  <button id="rightDrawDoneButton" type="button" class="draw-button draw-button-compact">Done</button>
+                </div>
+                <div class="draw-palette" aria-label="Drawing colors">
+                  <button id="rightColorAquaButton" type="button" class="draw-swatch" data-draw-color="#6dd3c7" aria-label="Aqua marker"></button>
+                  <button id="rightColorAmberButton" type="button" class="draw-swatch" data-draw-color="#f0b36b" aria-label="Amber marker"></button>
+                  <button id="rightColorRoseButton" type="button" class="draw-swatch" data-draw-color="#ff7f96" aria-label="Rose marker"></button>
+                  <button id="rightColorWhiteButton" type="button" class="draw-swatch" data-draw-color="#f5f7ff" aria-label="White marker"></button>
+                </div>
               </div>
               <div class="video-overlay">
                 <span id="rightTimeReadout">00:00.00</span>
@@ -256,6 +290,7 @@
                 <button id="rightCaptureStillButton" type="button" class="capture-button">Grab Still</button>
                 <button id="rightCaptureClipButton" type="button" class="capture-button">Grab Clip</button>
               </div>
+              <button id="rightDrawToggleButton" type="button" class="draw-toggle-button">Draw</button>
               <button
                 id="rightAudioButton"
                 type="button"

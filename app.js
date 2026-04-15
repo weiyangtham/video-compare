@@ -21,6 +21,8 @@ const state = {
   loopResumeUntilMs: 0,
   activeScrubber: null,
   activePan: null,
+  activeDraw: null,
+  activePaletteDrag: null,
   openSettingsSlot: null,
   openSettingsPanel: "menu",
   shortcutDialogOpen: false,
@@ -52,6 +54,7 @@ const elements = {
     fileInput: document.getElementById(`${prefix}FileInput`),
     video: document.getElementById(`${prefix}Video`),
     videoStage: document.getElementById(`${prefix}VideoStage`),
+    overlayCanvas: document.getElementById(`${prefix}OverlayCanvas`),
     dropZone: document.querySelector(`[data-drop-zone="${prefix}"]`),
     fileMeta: document.getElementById(`${prefix}FileMeta`),
     timeReadout: document.getElementById(`${prefix}TimeReadout`),
@@ -61,11 +64,13 @@ const elements = {
     stepForwardButton: document.getElementById(`${prefix}StepForwardButton`),
     captureStillButton: document.getElementById(`${prefix}CaptureStillButton`),
     captureClipButton: document.getElementById(`${prefix}CaptureClipButton`),
+    drawToggleButton: document.getElementById(`${prefix}DrawToggleButton`),
     audioButton: document.getElementById(`${prefix}AudioButton`),
     zoomInButton: document.getElementById(`${prefix}ZoomInButton`),
     zoomOutButton: document.getElementById(`${prefix}ZoomOutButton`),
     zoomResetButton: document.getElementById(`${prefix}ZoomResetButton`),
     zoomReadout: document.getElementById(`${prefix}ZoomReadout`),
+    drawPalette: document.getElementById(`${prefix}DrawPalette`),
     settingsButton: document.getElementById(`${prefix}SettingsButton`),
     settingsMenu: document.getElementById(`${prefix}SettingsMenu`),
     settingsPanels: Array.from(document.querySelectorAll(`#${prefix}SettingsMenu [data-settings-panel]`)),
@@ -79,6 +84,11 @@ const elements = {
       document.querySelectorAll(`#${prefix}SettingsMenu [data-playback-rate]`)
     ),
     scrubberTrack: document.querySelector(`[data-slot="${prefix}"] .video-scrubber-track`),
+    drawToolButtons: Array.from(document.querySelectorAll(`[id^="${prefix}Draw"][data-draw-tool]`)),
+    drawDoneButton: document.getElementById(`${prefix}DrawDoneButton`),
+    drawUndoButton: document.getElementById(`${prefix}DrawUndoButton`),
+    drawClearButton: document.getElementById(`${prefix}DrawClearButton`),
+    drawColorButtons: Array.from(document.querySelectorAll(`[id^="${prefix}Color"][data-draw-color]`)),
   };
 });
 
@@ -94,6 +104,11 @@ function createSlotState(slotKey) {
     zoomScale: 1,
     panX: 0,
     panY: 0,
+    drawTool: "pan",
+    drawPaletteOpen: false,
+    drawPalettePosition: null,
+    drawColor: "#6dd3c7",
+    annotations: [],
     captureBusy: false,
     elements: null,
   };
@@ -130,6 +145,10 @@ function bindGlobalEvents() {
   elements.shortcutHelpCloseButton.addEventListener("click", closeShortcutDialog);
   document.addEventListener("click", handleDocumentClick);
   document.addEventListener("keydown", handleDocumentKeydown);
+  document.addEventListener("pointermove", handleDocumentPointerMove);
+  document.addEventListener("pointerup", handleDocumentPointerUp);
+  document.addEventListener("pointercancel", handleDocumentPointerUp);
+  window.addEventListener("resize", render);
 }
 
 function bindSlotEvents(slotKey) {
@@ -145,10 +164,12 @@ function bindSlotEvents(slotKey) {
     stepForwardButton,
     captureStillButton,
     captureClipButton,
+    drawToggleButton,
     audioButton,
     zoomInButton,
     zoomOutButton,
     zoomResetButton,
+    drawPalette,
     settingsButton,
     settingsMenu,
     settingsNavButtons,
@@ -156,6 +177,12 @@ function bindSlotEvents(slotKey) {
     seekStepButtons,
     settingsSeekInput,
     playbackRateButtons,
+    overlayCanvas,
+    drawToolButtons,
+    drawDoneButton,
+    drawUndoButton,
+    drawClearButton,
+    drawColorButtons,
   } = slot.elements;
 
   panel.addEventListener("pointerdown", () => {
@@ -246,6 +273,8 @@ function bindSlotEvents(slotKey) {
   captureClipButton.addEventListener("click", () => {
     void captureClip(slotKey);
   });
+  drawToggleButton.addEventListener("click", () => toggleDrawPalette(slotKey));
+  drawPalette.addEventListener("pointerdown", (event) => startPaletteDrag(slotKey, event));
   audioButton.addEventListener("click", () => toggleSlotAudio(slotKey));
 
   zoomInButton.addEventListener("click", () => adjustZoom(slotKey, ZOOM_STEP));
@@ -317,7 +346,7 @@ function bindSlotEvents(slotKey) {
   });
 
   dropZone.addEventListener("pointerdown", (event) => {
-    if (event.button !== 0 || !slot.file || slot.zoomScale <= 1) {
+    if (event.button !== 0 || !slot.file || slot.zoomScale <= 1 || slot.drawTool !== "pan") {
       return;
     }
 
@@ -366,6 +395,21 @@ function bindSlotEvents(slotKey) {
 
   dropZone.addEventListener("pointerup", releasePan);
   dropZone.addEventListener("pointercancel", releasePan);
+
+  drawToolButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+      setDrawTool(slotKey, button.dataset.drawTool || "pan");
+    });
+  });
+  drawDoneButton.addEventListener("click", () => closeDrawPalette(slotKey));
+  drawUndoButton.addEventListener("click", () => undoDrawing(slotKey));
+  drawClearButton.addEventListener("click", () => clearDrawings(slotKey));
+  drawColorButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+      setDrawColor(slotKey, button.dataset.drawColor || slot.drawColor);
+    });
+  });
+  bindDrawingGesture(slotKey, overlayCanvas);
 }
 
 async function loadFileIntoSlot(slotKey, file) {
@@ -384,6 +428,10 @@ async function loadFileIntoSlot(slotKey, file) {
   slot.objectUrl = URL.createObjectURL(file);
   slot.duration = 0;
   slot.captureBusy = false;
+  slot.annotations = [];
+  slot.drawTool = "pan";
+  slot.drawPaletteOpen = false;
+  slot.drawColor = "#6dd3c7";
   ensureValidAudioSlot();
   syncAudio();
 
@@ -589,6 +637,14 @@ function render() {
     slot.elements.captureStillButton.disabled = !slot.file || slot.captureBusy;
     slot.elements.captureClipButton.disabled = !slot.file || slot.captureBusy;
     slot.elements.captureClipButton.textContent = slot.captureBusy ? "Capturing..." : "Grab Clip";
+    slot.elements.drawToggleButton.disabled = !slot.file;
+    slot.elements.drawToggleButton.classList.toggle("is-active", slot.drawPaletteOpen);
+    slot.elements.drawToggleButton.setAttribute("aria-pressed", String(slot.drawPaletteOpen));
+    slot.elements.drawPalette.hidden = !slot.drawPaletteOpen;
+    if (slot.drawPaletteOpen) {
+      positionDrawPalette(slot);
+    }
+    slot.elements.drawPalette.classList.toggle("is-dragging", state.activePaletteDrag?.slotKey === slot.slotKey);
     slot.elements.audioButton.disabled = !slot.file || (slot.slotKey === "right" && state.mode === "single");
     slot.elements.audioButton.classList.toggle("is-active", audibleSlotKey === slot.slotKey);
     slot.elements.audioButton.textContent = audibleSlotKey === slot.slotKey ? "🔊" : "🔇";
@@ -629,6 +685,23 @@ function render() {
     slot.elements.dropZone.classList.toggle("has-video", Boolean(slot.file));
     slot.elements.dropZone.classList.toggle("zoomed", slot.zoomScale > 1.001);
     slot.elements.dropZone.classList.toggle("is-panning", state.activePan?.slotKey === slot.slotKey);
+    slot.elements.dropZone.classList.toggle("is-drawing", slot.file && slot.drawPaletteOpen);
+    slot.elements.drawToolButtons.forEach((button) => {
+      const isActive = button.dataset.drawTool === slot.drawTool;
+      button.classList.toggle("is-active", isActive);
+      button.setAttribute("aria-pressed", String(isActive));
+      button.disabled = !slot.file || !slot.drawPaletteOpen;
+    });
+    slot.elements.drawDoneButton.disabled = !slot.file || !slot.drawPaletteOpen;
+    slot.elements.drawUndoButton.disabled = !slot.annotations.length || !slot.drawPaletteOpen;
+    slot.elements.drawClearButton.disabled = !slot.annotations.length || !slot.drawPaletteOpen;
+    slot.elements.drawColorButtons.forEach((button) => {
+      const isActive = button.dataset.drawColor === slot.drawColor;
+      button.classList.toggle("is-active", isActive);
+      button.setAttribute("aria-pressed", String(isActive));
+      button.disabled = !slot.file || !slot.drawPaletteOpen;
+    });
+    renderOverlay(slot);
     if (state.activeScrubber !== slot.slotKey) {
       slot.elements.timelineRange.value = String(slotTime);
     }
@@ -698,6 +771,8 @@ function toggleMode() {
     state.activeSlotKey = "left";
   }
   closeSettingsMenu();
+  closeDrawPalette("left", { silent: true });
+  closeDrawPalette("right", { silent: true });
   recalculateSharedDuration();
   ensureValidAudioSlot();
   seekTo(state.timelineTime);
@@ -1090,6 +1165,11 @@ function clearSlotMedia(slot) {
   slot.zoomScale = 1;
   slot.panX = 0;
   slot.panY = 0;
+  slot.drawTool = "pan";
+  slot.drawPaletteOpen = false;
+  slot.drawPalettePosition = null;
+  slot.drawColor = "#6dd3c7";
+  slot.annotations = [];
   slot.captureBusy = false;
 
   if (state.activeSlotKey === slot.slotKey) {
@@ -1301,6 +1381,7 @@ async function captureStill(slotKey) {
   }
 
   context.drawImage(video, 0, 0, canvas.width, canvas.height);
+  drawAnnotationsToContext(context, slot.annotations, canvas.width, canvas.height);
 
   const blob = await canvasToBlob(canvas, "image/png");
   if (!blob) {
@@ -1410,6 +1491,7 @@ async function recordSlotClip(slot, clipRange, clipFormat) {
   captureVideo.currentTime = clipRange.start;
   await waitForEvent(captureVideo, "seeked");
   context.drawImage(captureVideo, 0, 0, canvas.width, canvas.height);
+  drawAnnotationsToContext(context, slot.annotations, canvas.width, canvas.height);
 
   recorder.start();
   let rafId = null;
@@ -1417,6 +1499,7 @@ async function recordSlotClip(slot, clipRange, clipFormat) {
   await new Promise((resolve, reject) => {
     const draw = () => {
       context.drawImage(captureVideo, 0, 0, canvas.width, canvas.height);
+      drawAnnotationsToContext(context, slot.annotations, canvas.width, canvas.height);
 
       if (captureVideo.currentTime >= clipRange.end || captureVideo.ended) {
         resolve();
@@ -1569,6 +1652,370 @@ function setActiveSlot(slotKey) {
 
   state.activeSlotKey = state.mode === "single" ? "left" : slotKey;
   render();
+}
+
+function setDrawTool(slotKey, tool) {
+  const slot = state.slots[slotKey];
+  if (!slot.file) {
+    return;
+  }
+
+  slot.drawPaletteOpen = true;
+  slot.drawTool = tool === "line" ? "line" : "pen";
+  if (state.activeDraw?.slotKey === slotKey) {
+    state.activeDraw = null;
+  }
+  render();
+}
+
+function toggleDrawPalette(slotKey) {
+  const slot = state.slots[slotKey];
+  if (!slot.file) {
+    return;
+  }
+
+  if (slot.drawPaletteOpen) {
+    closeDrawPalette(slotKey);
+    return;
+  }
+
+  slot.drawPaletteOpen = true;
+  if (!slot.drawPalettePosition) {
+    slot.drawPalettePosition = getDefaultDrawPalettePosition(slotKey);
+  }
+  if (slot.drawTool !== "pen" && slot.drawTool !== "line") {
+    slot.drawTool = "pen";
+  }
+  render();
+}
+
+function closeDrawPalette(slotKey, { silent = false } = {}) {
+  const slot = state.slots[slotKey];
+  if (!slot) {
+    return;
+  }
+
+  slot.drawPaletteOpen = false;
+  slot.drawTool = "pan";
+  if (state.activeDraw?.slotKey === slotKey) {
+    state.activeDraw = null;
+  }
+  if (!silent) {
+    render();
+  }
+}
+
+function startPaletteDrag(slotKey, event) {
+  const slot = state.slots[slotKey];
+  if (!slot?.drawPaletteOpen) {
+    return;
+  }
+
+  if (event.target instanceof HTMLElement && event.target.closest("button")) {
+    return;
+  }
+
+  const rect = slot.elements.drawPalette.getBoundingClientRect();
+  state.activePaletteDrag = {
+    slotKey,
+    pointerId: event.pointerId,
+    offsetX: event.clientX - rect.left,
+    offsetY: event.clientY - rect.top,
+  };
+  slot.elements.drawPalette.setPointerCapture(event.pointerId);
+  event.preventDefault();
+  render();
+}
+
+function handleDocumentPointerMove(event) {
+  if (!state.activePaletteDrag || state.activePaletteDrag.pointerId !== event.pointerId) {
+    return;
+  }
+
+  const slot = state.slots[state.activePaletteDrag.slotKey];
+  if (!slot) {
+    return;
+  }
+
+  slot.drawPalettePosition = clampDrawPalettePosition(
+    event.clientX - state.activePaletteDrag.offsetX,
+    event.clientY - state.activePaletteDrag.offsetY,
+    slot.elements.drawPalette
+  );
+  render();
+}
+
+function handleDocumentPointerUp(event) {
+  if (!state.activePaletteDrag || state.activePaletteDrag.pointerId !== event.pointerId) {
+    return;
+  }
+
+  const slot = state.slots[state.activePaletteDrag.slotKey];
+  if (slot?.elements.drawPalette.hasPointerCapture(event.pointerId)) {
+    slot.elements.drawPalette.releasePointerCapture(event.pointerId);
+  }
+  state.activePaletteDrag = null;
+  render();
+}
+
+function positionDrawPalette(slot) {
+  if (!slot.drawPalettePosition) {
+    slot.drawPalettePosition = getDefaultDrawPalettePosition(slot.slotKey);
+  }
+
+  const clamped = clampDrawPalettePosition(
+    slot.drawPalettePosition.x,
+    slot.drawPalettePosition.y,
+    slot.elements.drawPalette
+  );
+  slot.drawPalettePosition = clamped;
+  slot.elements.drawPalette.style.left = `${clamped.x}px`;
+  slot.elements.drawPalette.style.top = `${clamped.y}px`;
+}
+
+function getDefaultDrawPalettePosition(slotKey) {
+  const slot = state.slots[slotKey];
+  const frameRect = slot.elements.dropZone.getBoundingClientRect();
+
+  return clampDrawPalettePosition(
+    frameRect.left + 14,
+    frameRect.top + 14,
+    slot.elements.drawPalette
+  );
+}
+
+function clampDrawPalettePosition(x, y, paletteElement) {
+  const viewportWidth = window.innerWidth;
+  const viewportHeight = window.innerHeight;
+  const rect = paletteElement.getBoundingClientRect();
+  const width = rect.width || 360;
+  const height = rect.height || 56;
+  const margin = 8;
+
+  return {
+    x: clamp(x, margin, Math.max(margin, viewportWidth - width - margin)),
+    y: clamp(y, margin, Math.max(margin, viewportHeight - height - margin)),
+  };
+}
+
+function setDrawColor(slotKey, color) {
+  const slot = state.slots[slotKey];
+  if (!slot.file) {
+    return;
+  }
+
+  slot.drawColor = color || slot.drawColor;
+  render();
+}
+
+function undoDrawing(slotKey) {
+  const slot = state.slots[slotKey];
+  if (!slot.annotations.length) {
+    return;
+  }
+
+  slot.annotations.pop();
+  render();
+}
+
+function clearDrawings(slotKey) {
+  const slot = state.slots[slotKey];
+  if (!slot.annotations.length) {
+    return;
+  }
+
+  slot.annotations = [];
+  if (state.activeDraw?.slotKey === slotKey) {
+    state.activeDraw = null;
+  }
+  render();
+}
+
+function bindDrawingGesture(slotKey, canvas) {
+  const releaseDrawing = (event) => {
+    if (!state.activeDraw || state.activeDraw.slotKey !== slotKey || state.activeDraw.pointerId !== event.pointerId) {
+      return;
+    }
+
+    finalizeDrawing(slotKey);
+    if (canvas.hasPointerCapture(event.pointerId)) {
+      canvas.releasePointerCapture(event.pointerId);
+    }
+  };
+
+  canvas.addEventListener("pointerdown", (event) => {
+    const slot = state.slots[slotKey];
+    if (event.button !== 0 || !slot.file || !slot.drawPaletteOpen || slot.drawTool === "pan") {
+      return;
+    }
+
+    const point = getNormalizedCanvasPoint(canvas, event);
+    if (!point) {
+      return;
+    }
+
+    event.preventDefault();
+    setActiveSlot(slotKey);
+    state.activeDraw = {
+      slotKey,
+      pointerId: event.pointerId,
+      tool: slot.drawTool,
+      color: slot.drawColor,
+      points: [point],
+    };
+    canvas.setPointerCapture(event.pointerId);
+    render();
+  });
+
+  canvas.addEventListener("pointermove", (event) => {
+    if (!state.activeDraw || state.activeDraw.slotKey !== slotKey || state.activeDraw.pointerId !== event.pointerId) {
+      return;
+    }
+
+    const point = getNormalizedCanvasPoint(canvas, event);
+    if (!point) {
+      return;
+    }
+
+    if (state.activeDraw.tool === "pen") {
+      state.activeDraw.points.push(point);
+    } else {
+      state.activeDraw.points[1] = point;
+    }
+    render();
+  });
+
+  canvas.addEventListener("pointerup", releaseDrawing);
+  canvas.addEventListener("pointercancel", releaseDrawing);
+}
+
+function finalizeDrawing(slotKey) {
+  const slot = state.slots[slotKey];
+  if (!state.activeDraw || state.activeDraw.slotKey !== slotKey) {
+    return;
+  }
+
+  const annotation = normalizeAnnotation(state.activeDraw);
+  state.activeDraw = null;
+  if (!annotation) {
+    render();
+    return;
+  }
+
+  slot.annotations.push(annotation);
+  render();
+}
+
+function normalizeAnnotation(activeDraw) {
+  const points = activeDraw.points.filter(Boolean);
+  if (activeDraw.tool === "pen") {
+    if (points.length < 2) {
+      return null;
+    }
+    return {
+      tool: "pen",
+      color: activeDraw.color,
+      points,
+    };
+  }
+
+  if (points.length < 2) {
+    return null;
+  }
+
+  const [start, end] = points;
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  if (Math.hypot(dx, dy) < 0.01) {
+    return null;
+  }
+
+  return {
+    tool: "line",
+    color: activeDraw.color,
+    points: [start, end],
+  };
+}
+
+function renderOverlay(slot) {
+  const canvas = slot.elements.overlayCanvas;
+  const width = canvas.clientWidth;
+  const height = canvas.clientHeight;
+  if (!width || !height) {
+    return;
+  }
+
+  const ratio = window.devicePixelRatio || 1;
+  const targetWidth = Math.round(width * ratio);
+  const targetHeight = Math.round(height * ratio);
+  if (canvas.width !== targetWidth || canvas.height !== targetHeight) {
+    canvas.width = targetWidth;
+    canvas.height = targetHeight;
+  }
+
+  const context = canvas.getContext("2d");
+  if (!context) {
+    return;
+  }
+
+  context.setTransform(1, 0, 0, 1, 0, 0);
+  context.clearRect(0, 0, canvas.width, canvas.height);
+  context.scale(ratio, ratio);
+  drawAnnotationsToContext(context, slot.annotations, width, height);
+  if (state.activeDraw?.slotKey === slot.slotKey) {
+    const preview = normalizeAnnotation(state.activeDraw);
+    if (preview) {
+      drawAnnotationsToContext(context, [preview], width, height);
+    }
+  }
+}
+
+function drawAnnotationsToContext(context, annotations, width, height) {
+  annotations.forEach((annotation) => {
+    if (!annotation?.points?.length) {
+      return;
+    }
+
+    context.save();
+    context.lineCap = "round";
+    context.lineJoin = "round";
+    context.strokeStyle = annotation.color;
+    context.lineWidth = Math.max(2, Math.min(width, height) * 0.0065);
+    context.shadowColor = "rgba(7, 11, 17, 0.45)";
+    context.shadowBlur = 8;
+    context.beginPath();
+    annotation.points.forEach((point, index) => {
+      const x = point.x * width;
+      const y = point.y * height;
+      if (index === 0) {
+        context.moveTo(x, y);
+      } else {
+        context.lineTo(x, y);
+      }
+    });
+    context.stroke();
+
+    if (annotation.tool === "line") {
+      const endPoint = annotation.points[annotation.points.length - 1];
+      context.fillStyle = annotation.color;
+      context.beginPath();
+      context.arc(endPoint.x * width, endPoint.y * height, context.lineWidth * 0.7, 0, Math.PI * 2);
+      context.fill();
+    }
+    context.restore();
+  });
+}
+
+function getNormalizedCanvasPoint(canvas, event) {
+  const rect = canvas.getBoundingClientRect();
+  if (!rect.width || !rect.height) {
+    return null;
+  }
+
+  return {
+    x: clamp((event.clientX - rect.left) / rect.width, 0, 1),
+    y: clamp((event.clientY - rect.top) / rect.height, 0, 1),
+  };
 }
 
 function getShortcutSlotKey() {

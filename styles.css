@@ -511,6 +511,7 @@ input[type="range"] {
 }
 
 .video-stage {
+  position: relative;
   width: 100%;
   height: 100%;
   transform-origin: center center;
@@ -524,6 +525,14 @@ video {
   background: #070b11;
   user-select: none;
   pointer-events: none;
+}
+
+.overlay-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
 }
 
 .drop-hint {
@@ -749,7 +758,7 @@ video {
 
 .video-toolbar {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto auto auto;
+  grid-template-columns: minmax(0, 1fr) auto auto auto auto auto;
   align-items: center;
   gap: 14px;
   padding: 12px 14px 0;
@@ -866,6 +875,119 @@ video {
   color: var(--muted);
   background: rgba(255, 255, 255, 0.03);
   border-color: rgba(174, 198, 255, 0.14);
+}
+
+.draw-button {
+  min-width: 64px;
+  padding: 8px 12px;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(174, 198, 255, 0.14);
+}
+
+.draw-button-compact {
+  min-width: 0;
+  padding-inline: 12px;
+}
+
+.draw-button.is-active {
+  color: var(--text);
+  background: linear-gradient(135deg, rgba(109, 211, 199, 0.22), rgba(122, 167, 255, 0.2));
+  border-color: rgba(109, 211, 199, 0.4);
+}
+
+.draw-toggle-button {
+  min-width: 96px;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(174, 198, 255, 0.14);
+  justify-self: end;
+}
+
+.draw-toggle-button.is-active {
+  color: var(--text);
+  background: linear-gradient(135deg, rgba(109, 211, 199, 0.22), rgba(122, 167, 255, 0.2));
+  border-color: rgba(109, 211, 199, 0.4);
+}
+
+.draw-overlay-panel {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 30;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  max-width: min(720px, calc(100vw - 24px));
+  padding: 8px 10px;
+  border-radius: 999px;
+  background: rgba(5, 8, 14, 0.78);
+  border: 1px solid rgba(174, 198, 255, 0.12);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.22);
+  cursor: grab;
+}
+
+.draw-overlay-panel[hidden] {
+  display: none !important;
+}
+
+.draw-overlay-panel.is-dragging {
+  cursor: grabbing;
+  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.28);
+}
+
+.draw-overlay-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.draw-palette {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 6px;
+  padding: 3px 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(174, 198, 255, 0.14);
+}
+
+.draw-swatch {
+  min-width: 24px;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border-radius: 999px;
+  border: 2px solid transparent;
+  box-shadow: inset 0 0 0 1px rgba(7, 11, 17, 0.58);
+}
+
+.draw-swatch[data-draw-color="#6dd3c7"] {
+  background: #6dd3c7;
+}
+
+.draw-swatch[data-draw-color="#f0b36b"] {
+  background: #f0b36b;
+}
+
+.draw-swatch[data-draw-color="#ff7f96"] {
+  background: #ff7f96;
+}
+
+.draw-swatch[data-draw-color="#f5f7ff"] {
+  background: #f5f7ff;
+}
+
+.draw-swatch.is-active {
+  border-color: rgba(245, 247, 255, 0.95);
+  transform: translateY(-1px);
+}
+
+.video-frame.is-drawing {
+  cursor: crosshair;
 }
 
 .audio-button {
@@ -1077,6 +1199,7 @@ textarea {
   }
 
   .audio-button,
+  .draw-toggle-button,
   .video-settings {
     justify-self: start;
   }
@@ -1109,12 +1232,20 @@ textarea {
   }
 
   .toolbar-button,
+  .draw-toggle-button,
   .video-settings {
     justify-self: stretch;
   }
 
   .settings-button {
     width: 100%;
+  }
+
+  .draw-overlay-panel {
+    max-width: calc(100vw - 20px);
+    justify-content: space-between;
+    flex-wrap: wrap;
+    border-radius: 18px;
   }
 
   .settings-menu {
